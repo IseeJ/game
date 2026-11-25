@@ -124,7 +124,9 @@ input::placeholder { color: #5d7090; font-weight: 400; }
 .band.z3 { background: rgba(255, 255, 255, .3); }
 .band.z4 { background: #fff; }
 .pins { position: relative; height: 0; }
-.pin { position: absolute; top: -70px; width: 4px; height: 70px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+.pin { position: absolute; top: -70px; width: 4px; height: 70px; margin-left: -2px; background: var(--ink); border-radius: 2px; box-shadow: 0 0 0 1.5px var(--bg); }
+.pin[data-pid] { transition: left .12s linear; }
+.pin.ghost { opacity: .6; }
 .pin.me { background: var(--accent); width: 6px; margin-left: -3px; }
 .pin span { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); font-size: .72rem; font-weight: 700; white-space: nowrap; background: var(--panel); padding: 1px 6px; border-radius: 6px; }
 .pin.up span { top: 92px; }
@@ -229,7 +231,7 @@ const SCALES = [
   ["Ideal Sunday", "Sunday ruined"],
   ["Would try once", "Would never try"],
   ["Low-key jealous", "Could not care less"],
-  ["Smash", "Pass"]
+  ["Smash", "Pass"],
 
   // general: food, films, things, people
   ["Breakfast food", "Dinner food"],
@@ -343,8 +345,11 @@ const SCALES = [
     peer.on('open', () => {
       busy = ''; roomCode = code;
       G = {
-        code, phase: 'lobby', laps: 2, giverScores: true, total: 0, round: 0, hostPid: myPid,
-        players: [{ pid: myPid, name: myName, score: 0, guess: null, pts: 0, conn: null, connected: true }],
+        code, phase: 'lobby', laps: 2,
+        giverScores: load('localStorage', 'ti_gscore') !== '0',     // lobby settings start as the host last left them
+        live: load('localStorage', 'ti_live') === '1',
+        total: 0, round: 0, hostPid: myPid,
+        players: [{ pid: myPid, name: myName, score: 0, guess: null, pos: null, pts: 0, conn: null, connected: true }],
         giverPid: null, scale: null, target: null, gain: 0, deck: []
       };
       setRoomUrl(code);
@@ -378,7 +383,7 @@ const SCALES = [
       if (old && old !== conn) { try { old.close(); } catch (e) {} }
     } else {
       if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
-      G.players.push({ pid, name, score: 0, guess: null, pts: 0, conn, connected: true });
+      G.players.push({ pid, name, score: 0, guess: null, pos: null, pts: 0, conn, connected: true });
     }
     conn.pid = pid;
     sync();
@@ -402,6 +407,7 @@ const SCALES = [
     if (!G.deck.length) G.deck = shuffle(SCALES);
     G.scale = G.deck.pop();
     G.target = 5 + Math.floor(Math.random() * 91);          // 5 to 95
+    G.players.forEach(p => { p.pos = null; });              // sliders start again in the middle
   }
 
   function startGame() {
@@ -466,6 +472,18 @@ const SCALES = [
       case 'giverScores':
         if (amHost && G.phase === 'lobby') { G.giverScores = !!msg.on; sync(); }
         break;
+      case 'watch':
+        if (amHost && G.phase === 'lobby') { G.live = !!msg.on; sync(); }
+        break;
+      case 'pos': {                             // a guesser's slider moved: pass it on to the clue giver only
+        const n = Math.round(Number(msg.pos));
+        if (!G.live || G.phase !== 'clue' || amGiver || p.guess !== null || !(n >= 0 && n <= 100)) return;
+        p.pos = n;
+        const m = { t: 'live', pid, pos: n }, g = P(G.giverPid);
+        if (G.giverPid === myPid) onLive(m);
+        else if (g && g.conn && g.conn.open) { try { g.conn.send(m); } catch (e) {} }
+        break;
+      }
       case 'start':
         if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
             G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
@@ -499,14 +517,17 @@ const SCALES = [
 
   function viewFor(pid) {
     const me = P(pid), open = G.phase === 'reveal';
+    const watch = G.live && G.phase === 'clue' && pid === G.giverPid;   // only the clue giver gets slider positions
     return {
-      code: G.code, phase: G.phase, laps: G.laps, giverScores: G.giverScores, total: G.total, round: G.round,
+      code: G.code, phase: G.phase, laps: G.laps, giverScores: G.giverScores, live: G.live, total: G.total, round: G.round,
       you: pid, hostPid: G.hostPid, giverPid: G.giverPid, scale: G.scale,
       target: (open || pid === G.giverPid) ? G.target : null,
       gain: G.gain, myGuess: me ? me.guess : null,
       players: G.players.map(p => ({
         pid: p.pid, name: p.name, score: p.score, connected: p.connected,
-        done: p.guess !== null, guess: open ? p.guess : null, pts: open ? p.pts : 0
+        done: p.guess !== null, guess: open ? p.guess : null, pts: open ? p.pts : 0,
+        pos: (watch && p.pid !== G.giverPid && (p.connected || p.guess !== null))
+          ? (p.guess !== null ? p.guess : (p.pos !== null ? p.pos : 50)) : null
       }))
     };
   }
@@ -550,7 +571,8 @@ const SCALES = [
         clearTimeout(joinTimer); busy = ''; lost = false;
         if (!view) setRoomUrl(roomCode);
         view = msg.v; render();
-      } else if (msg.t === 'toast') toast(msg.text);
+      } else if (msg.t === 'live') onLive(msg);
+      else if (msg.t === 'toast') toast(msg.text);
       else if (msg.t === 'full') joinFail('That room is full.');
     });
     conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(); } });
@@ -561,6 +583,16 @@ const SCALES = [
     if (peer) { try { peer.destroy(); } catch (e) {} }
     peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
     render();
+  }
+
+  // Clue giver only: one guesser's slider moved. Slide their pin without redrawing the screen.
+  function onLive(msg) {
+    if (!view || view.phase !== 'clue' || view.you !== view.giverPid) return;
+    const pl = view.players.find(x => x.pid === msg.pid);
+    if (!pl || pl.done) return;
+    pl.pos = msg.pos;
+    const pin = [...$app.querySelectorAll('.pin[data-pid]')].find(el => el.dataset.pid === msg.pid);
+    if (pin) pin.style.left = msg.pos + '%'; else render();
   }
 
   function act(msg) {
@@ -703,11 +735,15 @@ const SCALES = [
           '<label class="field inline"><span>Clue giver scores</span><select id="gscore">' +
           '<option value="1"' + (v.giverScores ? ' selected' : '') + '>Yes, the average guess</option>' +
           '<option value="0"' + (v.giverScores ? '' : ' selected') + '>No, only guessers</option></select></label>' +
+          '<label class="field inline"><span>Guesses</span><select id="watch">' +
+          '<option value="0"' + (v.live ? '' : ' selected') + '>Hidden until the reveal</option>' +
+          '<option value="1"' + (v.live ? ' selected' : '') + '>Clue giver sees them live</option></select></label>' +
           '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
           (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
           '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
         : '<p class="note">Waiting for the host to start. Everyone gives ' + v.laps + ' clue' + (v.laps > 1 ? 's' : '') + '. ' +
-          (v.giverScores ? 'The clue giver scores the average of the guesses.' : 'Only guessers score.') + '</p>') +
+          (v.giverScores ? 'The clue giver scores the average of the guesses.' : 'Only guessers score.') + ' ' +
+          (v.live ? 'The clue giver can watch the sliders live.' : 'Guesses are hidden until the reveal.') + '</p>') +
       '</main>';
   }
 
@@ -735,7 +771,8 @@ const SCALES = [
     return '<div class="scale"><div class="ends"><span>' + esc(v.scale[0]) + '</span><span>' + esc(v.scale[1]) + '</span></div>' +
       '<div class="track">' + bands + '</div>' +
       '<div class="pins">' + pins.map((p, i) =>
-        '<div class="pin' + (p.me ? ' me' : '') + (i % 2 ? ' up' : '') + '"' + (p.id ? ' id="' + p.id + '"' : '') + ' style="left:' + p.pos + '%">' +
+        '<div class="pin' + (p.me ? ' me' : '') + (p.ghost ? ' ghost' : '') + (i % 2 ? ' up' : '') + '"' + (p.id ? ' id="' + p.id + '"' : '') +
+        (p.pid ? ' data-pid="' + esc(p.pid) + '"' : '') + ' style="left:' + p.pos + '%">' +
         (p.label ? '<span>' + esc(p.label) + '</span>' : '') + '</div>').join('') + '</div>' +
       (pins.some(p => p.label) ? '<div class="pad"></div>' : '') + '</div>';
   }
@@ -756,7 +793,9 @@ const SCALES = [
       if (amGiver) {
         body = '<p class="status">Only you can see the target. Say one clue out loud that belongs right there.</p>' +
           '<p class="tip">Make it personal: something you\'ve done, own, love or can\'t stand. Don\'t use the words on the scale, and don\'t hint at left or right.</p>' +
-          scaleHTML(v.target, []) + legend;
+          (v.live ? '<p class="tip">You can watch their sliders move while they decide. Faded pins are not locked in yet.</p>' : '') +
+          scaleHTML(v.target, v.live ? v.players.filter(p => typeof p.pos === 'number').map(p =>
+            ({ pos: p.pos, pid: p.pid, ghost: !p.done, label: p.name + (p.done ? ' ✓' : '') })) : []) + legend;
         action = (locked === 0 ? '<button class="btn" data-act="swap">Different scale</button>' : '') +
           '<button class="btn primary big" data-act="reveal"' + (locked ? '' : ' disabled') + '>Reveal (' + locked + ' of ' + guessers.length + ' locked in)</button>';
       } else if (v.myGuess !== null) {
@@ -765,7 +804,9 @@ const SCALES = [
         if (amHost) action = '<button class="btn" data-act="reveal">Reveal now</button>';
       } else {
         body = '<p class="status">Listen to ' + giver + '\'s clue. Where on the scale does it sit for them?</p>' +
-          '<p class="tip">Talk it over, then slide and lock in. Guesses stay hidden until the reveal.</p>' +
+          '<p class="tip">Talk it over, then slide and lock in. ' + (v.live
+            ? giver + ' can see your slider move. The other guessers can\'t.'
+            : 'Guesses stay hidden until the reveal.') + '</p>' +
           scaleHTML(null, [{ pos: myPos, me: true, id: 'me' }]) +
           '<input type="range" id="dial" min="0" max="100" step="1" value="' + myPos + '" aria-label="Your guess">';
         action = '<button class="btn primary big" data-act="guess">Lock in</button>';
@@ -803,6 +844,16 @@ const SCALES = [
   }
 
   /* ---------------- EVENTS ---------------- */
+  // Tell the clue giver where my slider is, at most about twelve times a second.
+  let posTimer = null;
+  function sharePos() {
+    if (!view.live || posTimer) return;
+    posTimer = setTimeout(() => {
+      posTimer = null;
+      if (view && view.phase === 'clue' && view.myGuess === null) act({ t: 'pos', pos: myPos });
+    }, 80);
+  }
+
   function readName() {
     myName = myName.trim().slice(0, 16);
     if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
@@ -824,10 +875,12 @@ const SCALES = [
       myPos = parseInt(e.target.value, 10);
       const pin = document.getElementById('me');
       if (pin) pin.style.left = myPos + '%';
+      sharePos();
     }
   });
   $app.addEventListener('change', e => {
-    if (e.target.id === 'gscore') act({ t: 'giverScores', on: e.target.value === '1' });
+    if (e.target.id === 'gscore') { save('localStorage', 'ti_gscore', e.target.value); act({ t: 'giverScores', on: e.target.value === '1' }); }
+    if (e.target.id === 'watch') { save('localStorage', 'ti_live', e.target.value); act({ t: 'watch', on: e.target.value === '1' }); }
     if (e.target.id === 'laps' && !e.target.value) e.target.value = view.laps;   // left empty: put the current number back
   });
   $app.addEventListener('keydown', e => {
