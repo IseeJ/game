@@ -773,8 +773,7 @@ const SCALES = [
           : (best === 4 ? 'Bullseye.' : best ? 'Close.' : 'Nobody was close.')) + '</p>' +
         scaleHTML(v.target, gs.map(p => ({ pos: p.guess, me: p.pid === v.you, label: p.name }))) + legend +
         '<ul class="rows">' + gs.map(p => '<li class="' + (p.pts === 4 ? 'top' : '') + '"><span>' + esc(p.name) + '</span><span>' +
-          Math.abs(p.guess - v.target) + ' away · <b>+' + p.pts + '</b></span></li>').join('') + '</ul>' +
-        '<div class="story"><p class="lbl">Explain yourself</p><p>' + giver + ', tell everyone the story behind that clue, and why it sits there for you.</p></div>';
+          Math.abs(p.guess - v.target) + ' away · <b>+' + p.pts + '</b></span></li>').join('') + '</ul>';
       if (amGiver || amHost) action = '<button class="btn primary big" data-act="next">' + (v.round >= v.total ? 'See final scores' : 'Next round') + '</button>';
     }
 
