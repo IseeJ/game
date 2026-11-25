@@ -7,13 +7,15 @@
 <meta name="description" content="One friend gets a secret spot on a scale and gives a clue. Everyone else guesses where it sits. Play over a call with a room code.">
 <style>
 :root {
-  --bg: #0f1b2d;
-  --panel: #18283f;
-  --line: #2b3f5c;
-  --ink: #f2f6fb;
-  --dim: #93a4bd;
-  --accent: #ff7a59;
-  --cool: #4fd1c5;
+  --bg: #f6f3ed;
+  --panel: #ece7de;
+  --field: #fcfbf8;
+  --line: #d8d1c4;
+  --ink: #23211e;
+  --dim: #7a7368;
+  --accent: #b4532f;
+  --on-accent: #fff;
+  --cool: #4f6f62;
   --radius: 16px;
 }
 * { box-sizing: border-box; }
@@ -35,8 +37,8 @@ button, input, select { font: inherit; color: inherit; }
 .btn:hover:not(:disabled) { border-color: var(--ink); }
 .btn:active:not(:disabled) { transform: scale(.97); }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a0d08; }
-.btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.08); }
 .btn.big { padding: 14px 24px; font-size: 1.05rem; }
 .btn.small { padding: 6px 14px; font-size: .9rem; }
 .field { display: block; text-align: left; margin: 0 0 14px; }
@@ -45,28 +47,28 @@ button, input, select { font: inherit; color: inherit; }
 .field.inline span { margin: 0; }
 .field.inline input { width: 72px; text-align: center; }
 .field.inline em { font-style: normal; font-size: .85rem; }
-input[type=text], input:not([type]), select { width: 100%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
+input[type=text], input:not([type]), select { width: 100%; background: var(--field); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
 select { width: auto; }
-input::placeholder { color: #5d7090; font-weight: 400; }
+input::placeholder { color: #aaa397; font-weight: 400; }
 
 .howto { margin-top: 28px; }
 .howto h2 { margin: 0; font-size: 1.1rem; }
 .howto .note { margin: 2px 0 0; }
 .step { background: var(--panel); border-radius: var(--radius); overflow: hidden; margin-top: 12px; }
-.step svg { display: block; width: 100%; height: auto; background: #132238; }
+.step svg { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--line); }
 .step svg text { font: 700 13px "Helvetica Neue", Helvetica, Arial, sans-serif; }
 .step svg .s-sm { font-size: 11px; }
 .step svg .s-cool { fill: var(--cool); }
 .step svg .s-acc { fill: var(--accent); }
 .step svg .s-ink { fill: var(--ink); }
 .step svg .s-dim { fill: var(--dim); }
-.step svg .s-dark { fill: #1a0d08; }
-.step svg .s-bubble { fill: #263b5e; }
+.step svg .s-dark { fill: var(--on-accent); }
+.step svg .s-bubble { fill: var(--field); }
 .step svg .s-track { stroke: var(--line); stroke-width: 2; }
 .step svg .s-rail { stroke: var(--line); stroke-width: 4; stroke-linecap: round; }
-.step svg .s-pin { stroke: var(--bg); stroke-width: 1.5; }
+.step svg .s-pin { stroke: var(--panel); stroke-width: 1.5; }
 .step p { margin: 0; padding: 12px 14px 14px; display: flex; gap: 10px; font-size: .95rem; }
-.step p b { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #1a0d08; display: grid; place-items: center; font-size: .8rem; }
+.step p b { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-size: .8rem; }
 .home, .lobby { max-width: 420px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
 .logo { font-size: clamp(3.2rem, 17vw, 5rem); line-height: .9; letter-spacing: -.04em; margin: 0; font-weight: 900; }
 .logo i { font-style: normal; color: var(--accent); }
@@ -76,7 +78,7 @@ input::placeholder { color: #5d7090; font-weight: 400; }
 .joinrow { display: flex; gap: 10px; }
 .joinrow input { text-transform: uppercase; letter-spacing: .3em; font-size: 1.2rem; text-align: center; }
 .note { color: var(--dim); margin: 8px 0 0; }
-.err { color: #ff8fa3; font-weight: 700; margin: 8px 0 0; }
+.err { color: #a3261c; font-weight: 700; margin: 8px 0 0; }
 .fine { color: var(--dim); font-size: .85rem; margin: 16px 0 0; }
 .how { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font-size: .92rem; }
 .how li { margin-bottom: 4px; }
@@ -92,7 +94,7 @@ input::placeholder { color: #5d7090; font-weight: 400; }
 .plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
 .plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
 .plist.rank li { display: flex; justify-content: space-between; }
-.plist.rank li.top { background: var(--accent); color: #1a0d08; }
+.plist.rank li.top { background: var(--accent); color: var(--on-accent); }
 
 .bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
 .bar b { color: var(--accent); letter-spacing: .1em; }
@@ -116,13 +118,13 @@ input::placeholder { color: #5d7090; font-weight: 400; }
 .ends span:first-child { color: var(--cool); }
 .track {
   position: relative; height: 64px; margin: 12px 0 0; border-radius: 12px; overflow: hidden;
-  background: linear-gradient(90deg, rgba(79, 209, 197, .28), rgba(255, 122, 89, .28));
+  background: linear-gradient(90deg, rgba(79, 111, 98, .26), rgba(180, 83, 47, .26));
   border: 2px solid var(--line);
 }
 .band { position: absolute; top: 0; bottom: 0; }
-.band.z2 { background: rgba(255, 255, 255, .16); }
-.band.z3 { background: rgba(255, 255, 255, .3); }
-.band.z4 { background: #fff; }
+.band.z2 { background: rgba(35, 33, 30, .10); }
+.band.z3 { background: rgba(35, 33, 30, .22); }
+.band.z4 { background: var(--ink); }
 .pins { position: relative; height: 0; }
 .pin { position: absolute; top: -70px; width: 4px; height: 70px; margin-left: -2px; background: var(--ink); border-radius: 2px; box-shadow: 0 0 0 1.5px var(--bg); }
 .pin[data-pid] { transition: left .12s linear; }
@@ -149,11 +151,11 @@ input[type=range] { width: 100%; margin: 6px 0 0; height: 44px; accent-color: va
   .action .btn { flex: 1; }
 }
 
-.overlay { position: fixed; inset: 0; background: rgba(5, 10, 20, .8); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.overlay { position: fixed; inset: 0; background: rgba(35, 33, 30, .55); display: grid; place-items: center; padding: 20px; z-index: 10; }
 .dialog { background: var(--panel); border-radius: var(--radius); padding: 24px; max-width: 380px; }
 .dialog h2 { margin: 0 0 8px; }
 .dialog p { color: var(--dim); margin: 0 0 18px; }
-#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: #111; font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -964,14 +966,14 @@ const SCALES = [].concat(...Object.values(PACKS));
       <div class="step">
         <svg viewBox="0 0 280 110" aria-hidden="true">
           <defs><linearGradient id="howgrad" x1="0" x2="1">
-            <stop offset="0" stop-color="#4fd1c5" stop-opacity=".35"/><stop offset="1" stop-color="#ff7a59" stop-opacity=".35"/>
+            <stop offset="0" stop-color="#4f6f62" stop-opacity=".3"/><stop offset="1" stop-color="#b4532f" stop-opacity=".3"/>
           </linearGradient></defs>
           <text x="16" y="26" class="s-cool">Forgivable</text>
           <text x="264" y="26" text-anchor="end" class="s-acc">Unforgivable</text>
           <rect x="16" y="36" width="248" height="44" rx="9" fill="url(#howgrad)" class="s-track"/>
-          <rect x="138" y="37" width="84" height="42" fill="#fff" opacity=".16"/>
-          <rect x="155" y="37" width="50" height="42" fill="#fff" opacity=".3"/>
-          <rect x="170" y="37" width="20" height="42" fill="#fff"/>
+          <rect x="138" y="37" width="84" height="42" fill="#23211e" opacity=".1"/>
+          <rect x="155" y="37" width="50" height="42" fill="#23211e" opacity=".22"/>
+          <rect x="170" y="37" width="20" height="42" fill="#23211e"/>
           <text x="180" y="100" text-anchor="middle" class="s-dim s-sm">secret target</text>
         </svg>
         <p><b>1</b><span>One friend is the clue giver. They see a scale with a secret target on it.</span></p>
@@ -1006,9 +1008,9 @@ const SCALES = [].concat(...Object.values(PACKS));
           <text x="16" y="20" class="s-cool s-sm">Forgivable</text>
           <text x="264" y="20" text-anchor="end" class="s-acc s-sm">Unforgivable</text>
           <rect x="16" y="28" width="248" height="44" rx="9" fill="url(#howgrad)" class="s-track"/>
-          <rect x="138" y="29" width="84" height="42" fill="#fff" opacity=".16"/>
-          <rect x="155" y="29" width="50" height="42" fill="#fff" opacity=".3"/>
-          <rect x="170" y="29" width="20" height="42" fill="#fff"/>
+          <rect x="138" y="29" width="84" height="42" fill="#23211e" opacity=".1"/>
+          <rect x="155" y="29" width="50" height="42" fill="#23211e" opacity=".22"/>
+          <rect x="170" y="29" width="20" height="42" fill="#23211e"/>
           <rect x="68" y="23" width="5" height="54" rx="2" class="s-ink s-pin"/>
           <rect x="140" y="23" width="5" height="54" rx="2" class="s-ink s-pin"/>
           <rect x="179" y="23" width="6" height="54" rx="2" class="s-acc s-pin"/>
@@ -1099,9 +1101,9 @@ const SCALES = [].concat(...Object.values(PACKS));
         (p.label ? '<span>' + esc(p.label) + '</span>' : '') + '</div>').join('') + '</div>' +
       (pins.some(p => p.label) ? '<div class="pad"></div>' : '') + '</div>';
   }
-  const legend = '<p class="legend"><span><i style="background:#fff"></i>4 points</span>' +
-    '<span><i style="background:rgba(255,255,255,.45)"></i>3 points</span>' +
-    '<span><i style="background:rgba(255,255,255,.2)"></i>2 points</span></p>';
+  const legend = '<p class="legend"><span><i style="background:#23211e"></i>4 points</span>' +
+    '<span><i style="background:rgba(35,33,30,.3)"></i>3 points</span>' +
+    '<span><i style="background:rgba(35,33,30,.14)"></i>2 points</span></p>';
 
   function gameHTML() {
     const v = view;
