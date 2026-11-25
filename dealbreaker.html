@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deal Breaker — a red flags dating game</title>
+<meta name="description" content="Build the perfect date, then ruin someone else's with a red flag. Create a room, share the code, play with friends.">
+<style>
+:root {
+  --bg: #fff3ec;
+  --panel: #ffffff;
+  --line: #ecd5c8;
+  --ink: #2a1a1f;
+  --dim: #8a6f72;
+  --red: #e3324c;
+  --red-dark: #b81f37;
+  --wine: #4a1524;
+  --green: #1f9d6b;
+  --radius: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+
+/* buttons & fields */
+.btn {
+  appearance: none; border: 2px solid var(--line); background: var(--panel);
+  font-weight: 700; padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  transition: transform .08s, background .15s, border-color .15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--red); border-color: var(--red); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--red-dark); border-color: var(--red-dark); }
+.btn.big { padding: 14px 24px; font-size: 1.05rem; }
+.btn.small { padding: 6px 14px; font-size: .9rem; }
+.field { display: block; text-align: left; margin: 0 0 14px; }
+.field span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 6px; }
+.field.inline { display: flex; align-items: center; gap: 12px; }
+.field.inline span { margin: 0; }
+input, select {
+  width: 100%; background: var(--panel); border: 2px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; font-weight: 700;
+}
+select { width: auto; }
+input::placeholder { color: #c4adaf; font-weight: 400; }
+
+/* home & lobby */
+.home, .lobby { max-width: 420px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+.logo { font-size: clamp(3.2rem, 17vw, 5rem); line-height: .9; letter-spacing: -.04em; margin: 0; font-weight: 900; }
+.logo i { font-style: normal; color: var(--red); }
+.tag { color: var(--dim); margin: 4px 0 20px; font-size: 1.05rem; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: .85rem; margin: 8px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.joinrow { display: flex; gap: 10px; }
+.joinrow input { text-transform: uppercase; letter-spacing: .3em; font-size: 1.2rem; text-align: center; }
+.note { color: var(--dim); margin: 8px 0 0; }
+.err { color: var(--red-dark); font-weight: 700; margin: 8px 0 0; }
+.fine { color: var(--dim); font-size: .85rem; margin: 16px 0 0; }
+.how { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font-size: .92rem; }
+.how li { margin-bottom: 4px; }
+.lobby { text-align: center; align-items: center; }
+.lobby > * { width: 100%; }
+.lobby > .btn.small { width: auto; }
+.eyebrow { margin: 0; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+.code { font-size: clamp(3rem, 16vw, 4.5rem); font-weight: 900; letter-spacing: .12em; color: var(--red); line-height: 1; margin-bottom: 4px; }
+.code.small { font-size: 2.2rem; letter-spacing: 0; }
+.lobby h2 { margin: 24px 0 0; font-size: 1.1rem; text-align: left; }
+.dim { color: var(--dim); font-weight: 400; }
+.plist { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
+.plist li { padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; font-weight: 700; }
+.plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
+.plist.rank li { display: flex; justify-content: space-between; }
+.plist.rank li:first-child { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* game */
+.bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
+.bar b { color: var(--red); letter-spacing: .1em; }
+.scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
+.scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 6px 8px 6px 14px; font-size: .9rem; }
+.scores li.me .nm { text-decoration: underline; text-underline-offset: 3px; }
+.scores li.single { border-color: var(--red); }
+.scores li.off { opacity: .4; }
+.scores .mk { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--red); font-weight: 700; }
+.scores b { background: var(--bg); border-radius: 999px; min-width: 26px; text-align: center; padding: 2px 6px; }
+
+.table { max-width: 1080px; margin: 0 auto; padding: 8px 20px 120px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 800px) {
+  .table { grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
+  .prompt { position: sticky; top: 16px; }
+}
+.brief { background: var(--wine); color: #fff; border-radius: var(--radius); padding: 22px; }
+.brief h2 { margin: 0 0 14px; font-size: 1.45rem; line-height: 1.15; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .92rem; }
+.steps li { display: flex; gap: 10px; align-items: center; opacity: .5; }
+.steps li.on { opacity: 1; font-weight: 700; }
+.steps li span { width: 22px; height: 22px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font-size: .75rem; flex: none; }
+.steps li.on span { background: #fff; color: var(--wine); border-color: #fff; }
+
+.card {
+  position: relative; border-radius: var(--radius); padding: 14px;
+  font-weight: 700; font-size: 1.02rem; line-height: 1.25; text-align: left;
+  min-height: 130px; display: block; width: 100%;
+  border: 2px solid var(--line); background: var(--panel); color: var(--ink);
+}
+.card.perk { border-top: 6px solid var(--green); }
+.card.flag { background: var(--red); border-color: var(--red); color: #fff; }
+.card.back { background: repeating-linear-gradient(45deg, #f6dfd4 0 10px, #fbe9df 10px 20px); }
+button.card { cursor: pointer; transition: transform .1s, box-shadow .1s; }
+button.card:hover { transform: translateY(-4px); }
+.card.sel { box-shadow: 0 0 0 4px var(--ink); transform: translateY(-6px); }
+.status { margin: 0 0 16px; font-size: 1.15rem; font-weight: 700; }
+.lbl { margin: 18px 0 8px; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+.lbl:first-of-type { margin-top: 0; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+.dates { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.date { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: calc(var(--radius) + 6px); border: 2px solid var(--line); background: #fffaf6; text-align: left; }
+button.date { cursor: pointer; }
+button.date:hover { border-color: var(--ink); }
+.date.sel, .date.win { border-color: var(--ink); box-shadow: 0 0 0 3px var(--ink); }
+.date .card { min-height: 0; }
+.date .who { font-weight: 900; font-size: 1rem; padding: 2px 4px; }
+.date .but { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--red-dark); padding: 2px 4px 0; }
+.date .by { font-size: .82rem; color: var(--dim); padding: 0 4px; }
+.date.win .who::after { content: "  ♥ chosen"; color: var(--red); }
+
+.blank { display: inline-block; width: 3.5em; border-bottom: 3px solid currentColor; vertical-align: baseline; }
+.fillin { display: block; margin-top: 16px; padding: 14px; background: var(--panel); border: 2px solid var(--ink); border-radius: var(--radius); font-weight: 700; }
+.fillin span { display: block; margin-bottom: 8px; }
+.action { margin-top: 20px; }
+@media (max-width: 799px) {
+  .brief h2 { font-size: 1.25rem; }
+  .action:not(:empty) { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); }
+  .action .btn { width: 100%; }
+}
+
+/* overlay & toast */
+.overlay { position: fixed; inset: 0; background: rgba(42, 26, 31, .7); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--panel); border-radius: var(--radius); padding: 24px; max-width: 380px; }
+.dialog h2 { margin: 0 0 8px; }
+.dialog p { color: var(--dim); margin: 0 0 18px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: #fff; font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- PeerJS: browser-to-browser connections, no server of your own needed -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+/* =====================================================
+   THE CARDS. Edit freely: one card per line, in quotes,
+   with a comma after each.
+   ===================================================== */
+
+// Perks: the good things about a date.
+// A card with _____ (five underscores) is a fill-in: the player types the missing word.
+const PERKS = [
+  "Is incredible in bed and knows exactly when to stop talking",
+  "Looks at you the way you look at a cheese board",
+  "Has a body sculpted by a very horny Greek god",
+  "Is filthy rich and has no idea what anything costs",
+  "Gives head rubs so good you forget your own name",
+  "Will never, ever ask \"so what are we?\"",
+  "Cooks like a Michelin chef. Naked, on request",
+  "Their ex still says nice things about them",
+  "Has a jawline that could open a tin of beans",
+  "Owns a house. An actual house. No roommates",
+  "Goes to therapy and does the homework",
+  "Thinks your weirdest kink is \"kind of sweet, actually\"",
+  "Lasts as long as you want, then makes you a sandwich",
+  "Always finishes second, if you know what I mean",
+  "Could read your tax return aloud and make it erotic",
+  "Is extremely well equipped and humble about it",
+  "Pays for dinner and doesn't make it weird",
+  "Kills the spider and isn't a hero about it",
+  "Has a bed the size of a small country",
+  "Makes eye contact that should be illegal",
+  "Their dirty talk is grammatically flawless",
+  "Holds your hair back and never mentions it again",
+  "Has never once called themselves \"brutally honest\"",
+  "Brings you coffee in bed without being asked",
+  "Is a doctor, so the role play is medically accurate",
+  "Owns a private island. No cult",
+  "Finds your snoring \"kind of soothing\"",
+  "Is the best kisser in the northern hemisphere",
+  "Always has snacks. Always",
+  "Laughs at all your jokes, even the one about your divorce",
+  "Can build flat-pack furniture without swearing at you",
+  "Has a dog that likes you more than them",
+  "Gives massages that end exactly how you want them to",
+  "Their parents are loaded and live very far away",
+  "Will go down to the kitchen at 2 a.m. for you. Among other places",
+  "Smells like a forest that wants to take you to dinner",
+  "Texts back in under a minute, in full sentences",
+  "Has hands that know what they're doing",
+  "Is a firefighter and, yes, kept the uniform",
+  "Does your taxes as foreplay",
+  "Is emotionally available. Suspiciously available",
+  "Never gets hangovers and nurses yours",
+  "Thinks you look hot in your worst sweatpants",
+  "Owns a hot tub and a complete lack of shame",
+  "Remembers your coffee order and your safe word",
+  "Will fight your landlord",
+  "Is flexible. Schedule-wise. And otherwise",
+  "Has never sent an unsolicited photo of anything",
+  "Lets you have the last bite, every time",
+  "Makes your ex visibly jealous",
+  "Is a morning person who lets you not be one",
+  "Dances like nobody's watching, and everybody is",
+  "Earns six figures and still wants to hear about your day",
+  "Rubs your feet and never brings up the smell",
+  "Reads actual books and hasn't made it a personality",
+  "Is a stamina-based miracle",
+  "Charms your mum, and is not into your mum",
+  "Carries you to bed when you pass out on the couch",
+  "Has a tongue that deserves its own fan club",
+  "Knows where everything is. Everything",
+  "Would take a bullet for you, or at least a parking ticket",
+  "Plans the whole holiday, then lets you nap through it",
+  "Sends nudes with good lighting and real composition",
+  "Is a wine-drunk genius at karaoke",
+  "Has a yacht but gets seasick, so it's basically yours",
+  "Apologises first, properly, with snacks",
+  "Looks even better with the lights on",
+  "Shares the duvet like a decent human being",
+  "Will never suggest a threesome with their roommate Kyle",
+  "Makes you feel like the hottest person at the funeral",
+  "Can teleport, and will always pick you up from the airport",
+  "Their sweat smells like fresh laundry",
+  "Owns a dragon. It's friendly",
+  "Has a fridge that restocks itself",
+  "Can pause time so you can sleep in",
+  "Is a retired spy with great stories",
+  "Never needs the bathroom on road trips",
+  "Is a billionaire who hates billionaires",
+  "Can translate what your cat is thinking",
+  "Has a pocket that always holds the exact snack you want",
+  "Their laugh makes strangers happy",
+  "Is a wizard. A good one. Licensed",
+  "Cures your hangover by touching your forehead",
+  "Owns a small, tasteful moon",
+  "Is immune to jealousy",
+  "Is a sommelier, but for crisps",
+  "Finds a parking spot anywhere, instantly",
+  "Is an astronaut who always calls from orbit",
+  "Never loses an argument with customer service",
+  "Is a rock star who's home by ten",
+  "Every queue moves faster when they're in it",
+  "Has a private chef. The chef also likes you",
+  "Picks the right film on the first try",
+  "Is a vet, so your pets get free care for life",
+  "Is always the perfect temperature in bed",
+  "Can't lie to you. Physically can't",
+  "Is a pirate, the romantic kind, with dental",
+  "Has a waterslide from the bedroom to the pool",
+  "Can make it rain on people who annoy you",
+  "Your plants thrive when they're around",
+  "Wrote a hit song about you. It slaps",
+  "Owns a castle with working Wi-Fi",
+  "Is a stunt performer and it shows",
+  "Inherits a fortune every year and nobody knows why",
+  "Makes you look better in every photo",
+  "Always knows what you want for dinner",
+  "Is a pastry chef with the forearms to prove it",
+  "Can fold a fitted sheet",
+  "Has a time machine and only uses it for brunch bookings",
+  "Is royalty of a small, very chill country",
+  "Never has morning breath. Ever",
+  "Can breathe underwater and looks great doing it",
+  "Is a tattoo artist who won't let you make a mistake",
+  "Is a bartender who knows your drink before you do",
+  "Has a friend with a spare room in every city",
+  "Is a detective who always finds your keys",
+  "Is a superhero. The rent-paying kind",
+  "Gets you upgraded on every flight",
+  "Can mute anyone within ten metres",
+  "Their hugs fix your posture",
+  "Is world-famous for _____",
+  "Has a lifetime supply of _____",
+  "Will buy you _____ whenever you ask",
+  "Invented _____",
+  "Looks amazing in _____",
+  "Can summon _____ at will",
+  "Lives in a house made of _____",
+  "Is best friends with _____",
+  "Brings you _____ every morning",
+  "Has a tattoo of you riding _____"
+];
+
+// Red flags: the catch.
+const FLAGS = [
+  "Moans their own name",
+  "Calls their mum to debrief straight after sex",
+  "Has a \"no kissing, it's too intimate\" rule",
+  "Keeps a laminated ranking of everyone they've slept with. You're mid-table",
+  "Cries afterwards. Every time. For an hour",
+  "Refers to their genitals by a first name and a job title",
+  "Their roommate is their ex. So is their landlord",
+  "Finishes in ninety seconds, then goes for a high five",
+  "Has told your boss, in detail, what they like about your feet",
+  "Believes showering \"washes off the pheromones\"",
+  "Asks waiters to call them \"Daddy\"",
+  "Narrates sex like a nature documentary",
+  "Is married. Twice. Currently",
+  "Got your face tattooed on their thigh. You met on Tuesday",
+  "Keeps the socks on. And the shoes. And the helmet",
+  "Thinks foreplay is texting \"you up?\"",
+  "Does crypto, CrossFit and improv, and explains all three in bed",
+  "Sleeps in a race-car bed. Is 41",
+  "Their safe word is your mother's maiden name",
+  "Brings an acoustic guitar to bed",
+  "Has never washed their sheets, \"on principle\"",
+  "Sends you an invoice after every date",
+  "Livestreams everything. Everything",
+  "Does a little victory dance when they finish",
+  "Owns exactly one towel",
+  "Replies to nudes with \"haha nice\"",
+  "Gets blackout drunk at brunch and fights the waiter",
+  "Has a group chat that votes on your relationship",
+  "Lives in a van parked outside their ex's house",
+  "Is \"saving it for marriage\" and proposes on date one",
+  "Chews gum during. Blows bubbles",
+  "Can only get in the mood to whale song at full volume",
+  "Thinks the female orgasm was invented to sell candles",
+  "Shouts \"GOAL!\" at the big moment",
+  "Asks \"did you finish?\" in front of your parents",
+  "Has a python that sleeps in the bed and \"gets jealous\"",
+  "Keeps a jar of their own toenails on the nightstand",
+  "Their mum picks out their underwear. And now yours",
+  "Says \"m'lady\" or \"good sir\" in bed, without irony",
+  "Is on first-name terms with every bailiff in town",
+  "Considers farting a love language",
+  "Sells feet pics online. It's going badly",
+  "Counts out loud",
+  "Wears a Bluetooth earpiece at all times, including then",
+  "Pees in the shower. And the sink. And, once, the wardrobe",
+  "Sleepwalks to their ex's place",
+  "Takes work calls mid-sex. \"Sorry, I have to get this\"",
+  "Owes money to several very calm men",
+  "Has a framed photo of themselves above the bed. Shirtless. Winking",
+  "Holds eye contact with the dog the entire time",
+  "Calls it \"making sweet love\" and means it",
+  "Performs a full 40-minute stand-up set as pillow talk",
+  "Their kink is your tax returns",
+  "Is banned from three water parks and won't say why",
+  "Vapes in bed. Mango",
+  "Has been texting their ex \"for closure\" since 2017",
+  "Brushes their teeth once a week, \"whether they need it or not\"",
+  "Thinks deodorant is a government plot",
+  "Has a sex playlist. It's all sea shanties",
+  "Rates your performance out of ten, with written notes",
+  "Lives with nine roommates and very thin walls",
+  "Introduces you as \"my current partner\"",
+  "Wants an open relationship, but only on their side",
+  "Is 38 and their mum still tucks them in",
+  "Has opinions about your body count and a spreadsheet to back them up",
+  "Can only finish while golf is on",
+  "Whispers \"this is going in the podcast\"",
+  "Clips their toenails in bed and flicks them at you",
+  "Keeps a labelled drawer of \"souvenirs\" from every ex",
+  "Says \"I love you\" to the delivery driver, but never to you",
+  "Turns into a pigeon when nervous",
+  "Is haunted. The ghost has opinions about you",
+  "Only speaks in movie-trailer voice",
+  "Is, legally speaking, a cult leader",
+  "Sheds. A lot",
+  "Their evil twin is always around",
+  "Ends every sentence with \"allegedly\"",
+  "Can't walk past a fountain without getting in",
+  "Is cursed. Mildly, but it's contagious",
+  "Brings a clipboard on dates",
+  "Bites. Not in the fun way",
+  "Is 900 years old and tired",
+  "Their hands are always wet",
+  "Honks instead of laughing",
+  "Is followed everywhere by a mariachi band they can't afford",
+  "Has a nemesis, and it's your grandma",
+  "Communicates only through interpretive dance",
+  "Keeps a live eel in the bathtub",
+  "Is always mid-sandwich",
+  "Screams when the microwave finishes",
+  "Sleeps standing up, eyes open, facing you",
+  "Thinks every song is about them. Sues",
+  "Is trailed by one very loyal wasp",
+  "Is a werewolf, but only turns into a chihuahua",
+  "Refers to you as \"the plaintiff\"",
+  "Whistles constantly. One note",
+  "Has to win at everything. Including hugs",
+  "Is a mime, on and off the clock",
+  "Asks to speak to the manager of your feelings",
+  "Owns a sword and brings it to brunch",
+  "Gives every story a twenty-minute prologue",
+  "Is on the run from the circus",
+  "Their feet are on backwards",
+  "Scores your cooking out of 100 on a little paddle",
+  "Leaves a trail of glitter wherever they go",
+  "Is a time traveller who keeps spoiling your future",
+  "Smells faintly, permanently, of egg",
+  "Owns a parrot that repeats your secrets",
+  "Answers every question with \"who's asking?\"",
+  "Is on a juice cleanse forever, and now so are you",
+  "Has a theme song and plays it on entering any room",
+  "Trips over nothing, hourly, and blames you",
+  "Is duke of a country that's at war with yours",
+  "Their car horn is their own voice saying their name",
+  "Has an imaginary friend who hates you",
+  "Does air guitar at funerals",
+  "Eats cereal with water and will defend it",
+  "Tells strangers your salary",
+  "Is building a robot version of you \"just in case\"",
+  "Texts exclusively in riddles",
+  "Must touch every painting in the museum",
+  "Is a lighthouse keeper and will not leave the lighthouse",
+  "Is banned from _____",
+  "Keeps _____ in the freezer",
+  "Is terrified of _____",
+  "Has a shrine to _____ in the bedroom",
+  "Brings _____ to every date",
+  "Is in love with _____, and it isn't you",
+  "Only ever talks about _____",
+  "Cries whenever they see _____",
+  "Got fired for _____ at work",
+  "Yells \"_____!\" at the big moment"
+];
+
+/* =====================================================
+   THE GAME. The player who creates the room is the host:
+   their browser holds the real game state and sends each
+   player only what they are allowed to see.
+   ===================================================== */
+(() => {
+  'use strict';
+
+  const PREFIX = 'dealbreaker-v1-';
+  const PERK_HAND = 4, FLAG_HAND = 3;
+  const MIN_PLAYERS = 3, MAX_PLAYERS = 10;
+  const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+  const $app = document.getElementById('app');
+  const $toast = document.getElementById('toast');
+
+  const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
+  const save = (store, k, v) => { try { window[store].setItem(k, v); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const makeCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
+  const BLANK = '_____';
+  const show = c => esc(c).replace(BLANK, '<span class="blank"></span>');
+  // A fill-in card needs the player's own word before it can be played.
+  const filled = (c, f) => {
+    if (!c.includes(BLANK)) return c;
+    f = String(f || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    return f ? c.replace(BLANK, f) : null;
+  };
+  const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+
+  let myPid = load('sessionStorage', 'db_pid');
+  if (!myPid) { myPid = Math.random().toString(36).slice(2, 12); save('sessionStorage', 'db_pid', myPid); }
+  let myName = load('localStorage', 'db_name') || '';
+  let roomCode = cleanCode(new URLSearchParams(location.search).get('room'));
+
+  let peer = null, hostConn = null, isHost = false;
+  let G = null;        // full game state (host only)
+  let view = null;     // what this player is allowed to see
+  let busy = '', homeErr = '', lost = false, joinTimer = null;
+  let sel = [], pickIdx = null, selKey = '', fillText = {};
+
+  /* ---------------- HOST ---------------- */
+  const P = pid => G.players.find(p => p.pid === pid);
+
+  function createRoom() {
+    isHost = true;
+    const code = makeCode();
+    busy = 'Creating room…'; render();
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      busy = ''; roomCode = code;
+      G = {
+        code, phase: 'lobby', goal: 5, round: 0, hostPid: myPid,
+        players: [newPlayer(myPid, myName, null)],
+        singlePid: null, order: [], table: [], winnerPid: null,
+        decks: {}, extra: []
+      };
+      setRoomUrl(code);
+      sync();
+    });
+    peer.on('connection', conn => {
+      conn.on('data', msg => {
+        if (!G || !msg || typeof msg !== 'object') return;
+        if (msg.t === 'join') hostJoin(conn, msg);
+        else if (conn.pid) handle(conn.pid, msg);
+      });
+      conn.on('close', () => hostLeave(conn));
+      conn.on('error', () => hostLeave(conn));
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
+      else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function newPlayer(pid, name, conn) {
+    return { pid, name, score: 0, perks: [], flags: [], date: null, flag: null, conn, connected: true };
+  }
+
+  function hostJoin(conn, msg) {
+    const pid = String(msg.pid || '').slice(0, 20);
+    const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
+    if (!pid) return;
+    let p = P(pid);
+    if (p) {                                   // same player coming back
+      if (p.pid === G.hostPid) return;
+      const old = p.conn;
+      p.conn = conn; p.connected = true; p.name = name;
+      if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    } else {
+      if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
+      p = newPlayer(pid, name, conn);
+      G.players.push(p);
+      if (G.phase !== 'lobby' && G.phase !== 'gameover') refill(p);
+    }
+    conn.pid = pid;
+    sync();
+  }
+
+  function hostLeave(conn) {
+    if (!G || !conn.pid) return;
+    const p = P(conn.pid);
+    if (!p || p.conn !== conn) return;
+    p.conn = null; p.connected = false;
+    if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
+    if (p.pid === G.singlePid && ['perks', 'sabotage', 'judging'].includes(G.phase)) {
+      toastAll(p.name + ' (the single) dropped out. Round skipped.');
+      startRound(); return;
+    }
+    advance();
+    sync();
+  }
+
+  function draw(k) {
+    const d = G.decks[k];
+    if (!d.draw.length) { d.draw = shuffle(d.discard); d.discard = []; }
+    return d.draw.pop();
+  }
+  function refill(p) {
+    while (p.perks.length < PERK_HAND) { const c = draw('perk'); if (c === undefined) break; p.perks.push(c); }
+    while (p.flags.length < FLAG_HAND) { const c = draw('flag'); if (c === undefined) break; p.flags.push(c); }
+  }
+
+  function startGame() {
+    G.decks = {
+      perk: { draw: shuffle([...new Set(PERKS)]), discard: [] },
+      flag: { draw: shuffle([...new Set(FLAGS)]), discard: [] }
+    };
+    G.round = 0; G.singlePid = null; G.extra = [];
+    G.players = G.players.filter(p => p.connected);
+    G.players.forEach(p => { p.score = 0; p.perks = []; p.flags = []; p.date = null; p.flag = null; });
+    startRound();
+  }
+
+  function startRound() {
+    G.players.forEach(p => {
+      if (p.date) { G.decks.perk.discard.push(...p.rawDate); p.date = null; }
+      if (p.flag) { G.decks.flag.discard.push(p.rawFlag); p.flag = null; }
+    });
+    G.decks.flag.discard.push(...G.extra); G.extra = [];
+    G.table = []; G.order = []; G.winnerPid = null;
+    const live = G.players.filter(p => p.connected);
+    if (live.length < 2) {
+      G.players = live; G.phase = 'lobby';
+      toastAll('Not enough players left. Back to the lobby.');
+      sync(); return;
+    }
+    const n = G.players.length;
+    const cur = G.players.findIndex(p => p.pid === G.singlePid);
+    for (let i = 1; i <= n; i++) {
+      const cand = G.players[(cur + i + n) % n];
+      if (cand.connected) { G.singlePid = cand.pid; break; }
+    }
+    G.round++;
+    G.players.forEach(refill);
+    G.phase = 'perks';
+    sync();
+  }
+
+  // Move the round along once everyone we are waiting on has played.
+  function advance() {
+    if (G.phase === 'perks') {
+      const need = G.players.filter(p => p.connected && p.pid !== G.singlePid);
+      if (!need.length || !need.every(p => p.date)) return;
+      G.order = shuffle(G.players.filter(p => p.date).map(p => p.pid));
+      if (G.order.length >= 2) G.phase = 'sabotage';
+      else toJudging();
+    } else if (G.phase === 'sabotage') {
+      if (G.order.every(pid => { const p = P(pid); return !p || !p.connected || p.flag; })) toJudging();
+    }
+  }
+
+  // Each dater's red flag lands on the next date in the circle.
+  function toJudging() {
+    const n = G.order.length;
+    G.table = shuffle(G.order.map((pid, i) => {
+      const from = n >= 2 ? P(G.order[(i - 1 + n) % n]) : null;
+      let flag = from && from.flag, by = flag ? from.pid : null;
+      if (!flag) {   // saboteur left: deal one at random
+        for (let t = 0; t < 6; t++) { flag = draw('flag'); if (flag === undefined) break; G.extra.push(flag); if (!flag.includes(BLANK)) break; }
+        if (flag) flag = flag.replace(BLANK, 'something unspeakable');
+      }
+      return { pid, cards: P(pid).date, flag: flag || null, by };
+    }));
+    G.phase = 'judging';
+  }
+
+  // Every player action lands here (the host's own actions too).
+  function handle(pid, msg) {
+    const p = P(pid);
+    if (!p) return;
+    const amHost = pid === G.hostPid, amSingle = pid === G.singlePid;
+    switch (msg.t) {
+      case 'goal':
+        if (amHost && G.phase === 'lobby') { G.goal = Math.min(15, Math.max(3, parseInt(msg.goal, 10) || 5)); sync(); }
+        break;
+      case 'start':
+        if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
+            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+        break;
+      case 'date': {
+        if (G.phase !== 'perks' || amSingle || p.date) return;
+        const cards = Array.isArray(msg.cards) ? msg.cards : [];
+        if (cards.length !== 2 || cards[0] === cards[1] || !cards.every(c => p.perks.includes(c))) return;
+        const done = cards.map((c, i) => filled(c, msg.fills && msg.fills[i]));
+        if (done.includes(null)) return;
+        p.perks = p.perks.filter(c => !cards.includes(c));
+        p.date = done; p.rawDate = cards;
+        refill(p); advance(); sync();
+        break;
+      }
+      case 'flag': {
+        if (G.phase !== 'sabotage' || !G.order.includes(pid) || p.flag || !p.flags.includes(msg.card)) return;
+        const flag = filled(msg.card, msg.fill);
+        if (flag === null) return;
+        p.flags = p.flags.filter(c => c !== msg.card);
+        p.flag = flag; p.rawFlag = msg.card;
+        refill(p); advance(); sync();
+        break;
+      }
+      case 'pick': {
+        if (G.phase !== 'judging' || !amSingle) return;
+        const s = G.table[msg.i];
+        if (!s) return;
+        G.winnerPid = s.pid;
+        const w = P(s.pid); if (w) w.score++;
+        G.phase = 'result';
+        sync();
+        break;
+      }
+      case 'next':
+        if (G.phase !== 'result' || !(amHost || amSingle)) return;
+        if (G.players.some(x => x.score >= G.goal)) { G.phase = 'gameover'; sync(); }
+        else startRound();
+        break;
+      case 'lobby':
+        if (amHost && G.phase === 'gameover') {
+          G.players = G.players.filter(x => x.connected);
+          G.players.forEach(x => { x.score = 0; x.perks = []; x.flags = []; x.date = null; x.flag = null; });
+          G.phase = 'lobby'; sync();
+        }
+        break;
+    }
+  }
+
+  function viewFor(pid) {
+    const me = P(pid), ph = G.phase;
+    let target = null;
+    if (ph === 'sabotage') {
+      const i = G.order.indexOf(pid);
+      if (i >= 0) { const t = P(G.order[(i + 1) % G.order.length]); target = { name: t.name, cards: t.date }; }
+    }
+    const open = ph === 'judging' || ph === 'result';
+    return {
+      code: G.code, phase: ph, goal: G.goal, round: G.round,
+      you: pid, hostPid: G.hostPid, singlePid: G.singlePid, winnerPid: G.winnerPid,
+      players: G.players.map(p => ({
+        pid: p.pid, name: p.name, score: p.score, connected: p.connected,
+        done: ph === 'perks' ? !!p.date : ph === 'sabotage' ? (!G.order.includes(p.pid) || !!p.flag) : false
+      })),
+      perks: me ? me.perks : [], flags: me ? me.flags : [],
+      date: me ? me.date : null, myFlag: me ? me.flag : null, target,
+      table: open ? G.table.map(s => ({ pid: s.pid, cards: s.cards, flag: s.flag, by: ph === 'result' ? s.by : null })) : null
+    };
+  }
+
+  function sync() {
+    G.players.forEach(p => {
+      if (p.conn && p.conn.open) { try { p.conn.send({ t: 'state', v: viewFor(p.pid) }); } catch (e) {} }
+    });
+    view = viewFor(myPid);
+    render();
+  }
+
+  function toastAll(text) {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', text }); } catch (e) {} } });
+    toast(text);
+  }
+
+  /* ---------------- GUEST ---------------- */
+  function joinRoom(code) {
+    isHost = false; roomCode = code;
+    busy = 'Joining ' + code + '…'; render();
+    peer = new Peer();
+    joinTimer = setTimeout(() => joinFail('Could not find that room. Check the code and make sure the host still has the game open.'), 15000);
+    peer.on('open', () => connectHost());
+    peer.on('error', err => {
+      if (err.type === 'peer-unavailable') {
+        if (view) { lost = true; render(); }
+        else joinFail('No room with that code. Check it and try again.');
+      } else if (!view) joinFail('Connection problem. Check your internet and try again.');
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function connectHost() {
+    const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+    hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('data', msg => {
+      if (!msg || conn !== hostConn) return;
+      if (msg.t === 'state') {
+        clearTimeout(joinTimer); busy = ''; lost = false;
+        if (!view) setRoomUrl(roomCode);
+        view = msg.v; render();
+      } else if (msg.t === 'toast') toast(msg.text);
+      else if (msg.t === 'full') joinFail('That room is full.');
+    });
+    conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(); } });
+  }
+
+  function joinFail(text) {
+    clearTimeout(joinTimer);
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
+    render();
+  }
+
+  function act(msg) {
+    if (isHost) handle(myPid, msg);
+    else if (hostConn && hostConn.open) hostConn.send(msg);
+  }
+
+  /* ---------------- RENDERING ---------------- */
+  function setRoomUrl(code) {
+    try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  }
+  const shareUrl = () => location.origin + location.pathname + '?room=' + view.code;
+
+  let toastTimer = null;
+  function toast(text) {
+    $toast.textContent = text; $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
+  }
+
+  function render() {
+    if (!view) { $app.innerHTML = homeHTML(); return; }
+    const key = view.round + ':' + view.phase;
+    if (key !== selKey) { selKey = key; sel = []; pickIdx = null; fillText = {}; }
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    if (lost) {
+      html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2>' +
+        '<p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button>' +
+        '<button class="btn" data-act="leave">Leave</button></div></div></div>';
+    }
+    // keep the cursor where it was if the screen refreshes while someone is typing
+    const a = document.activeElement, id = a && a.id, pos = a && a.selectionStart;
+    $app.innerHTML = html;
+    if (id) { const el = document.getElementById(id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } }
+  }
+
+  function homeHTML() {
+    const dis = busy ? ' disabled' : '';
+    return '<main class="home">' +
+      '<h1 class="logo">Deal<br>Breaker<i>.</i></h1>' +
+      '<p class="tag">Build the perfect date. Then ruin someone else\'s.</p>' +
+      '<label class="field"><span>Your name</span>' +
+      '<input id="name" maxlength="16" autocomplete="off" placeholder="e.g. Gary" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>Create a room</button>' +
+      '<div class="or"><span>or join with a code</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
+      (busy ? '<p class="note">' + esc(busy) + '</p>' : '') +
+      (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
+      '<ol class="how"><li>One player is single each round.</li>' +
+      '<li>Everyone else builds them a date from two perks.</li>' +
+      '<li>Then you each slap a red flag on a rival\'s date.</li>' +
+      '<li>The single picks the date they could live with.</li></ol>' +
+      '<p class="fine">' + MIN_PLAYERS + ' to ' + MAX_PLAYERS + ' players, each on their own phone or laptop. Adult humour, 18+.</p>' +
+      '</main>';
+  }
+
+  function lobbyHTML() {
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const goals = [3, 5, 7, 10].map(g => '<option value="' + g + '"' + (g === v.goal ? ' selected' : '') + '>' + g + ' points</option>').join('');
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Room code</p>' +
+      '<div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">Copy invite link</button>' +
+      '<h2>Players <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p =>
+        '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
+      (amHost
+        ? '<label class="field inline"><span>First to</span><select id="goal">' + goals + '</select></label>' +
+          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
+          (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
+          '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
+        : '<p class="note">Waiting for the host to start. First to ' + v.goal + ' points wins.</p>') +
+      '</main>';
+  }
+
+  function scoresHTML() {
+    const v = view, playing = v.phase === 'perks' || v.phase === 'sabotage';
+    return '<ul class="scores">' + v.players.map(p => {
+      const single = p.pid === v.singlePid;
+      const mark = single ? 'single' : (playing && p.done ? '✓' : '');
+      return '<li class="' + (single ? 'single ' : '') + (p.connected ? '' : 'off ') + (p.pid === v.you ? 'me' : '') + '">' +
+        '<span class="nm">' + esc(p.name) + '</span>' +
+        (mark ? '<span class="mk">' + mark + '</span>' : '') +
+        '<b>' + p.score + '</b></li>';
+    }).join('') + '</ul>';
+  }
+
+  function gameHTML() {
+    const v = view, ph = v.phase;
+    const amSingle = v.you === v.singlePid, amHost = v.you === v.hostPid;
+    const name = pid => { const p = v.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+    const single = esc(name(v.singlePid));
+    const waiting = v.players.filter(p => p.connected && p.pid !== v.singlePid && !p.done).length;
+    const more = waiting + ' more player' + (waiting === 1 ? '' : 's');
+    const cards = (list, cls) => list.map(c => '<div class="card ' + cls + '">' + show(c) + '</div>').join('');
+    const hand = (list, cls) => '<div class="grid">' + list.map((c, i) =>
+      '<button class="card ' + cls + (sel.includes(i) ? ' sel' : '') + '" data-act="sel" data-i="' + i + '">' + show(c) + '</button>').join('') + '</div>' +
+      sel.filter(i => list[i] && list[i].includes(BLANK)).map(i =>
+        '<label class="fillin"><span>Fill in the blank: ' + show(list[i]) + '</span>' +
+        '<input id="fill-' + i + '" data-fill="' + i + '" maxlength="40" autocomplete="off" placeholder="Type anything" value="' + esc(fillText[i] || '') + '"></label>').join('');
+    let status = '', body = '', action = '';
+
+    if (ph === 'perks') {
+      if (amSingle) {
+        status = 'You are single this round. Your friends are building dates for you. Waiting on ' + more + '.';
+        body = '<div class="grid">' + v.players.filter(p => p.pid !== v.singlePid && p.done).map(() => '<div class="card back"></div>').join('') + '</div>';
+      } else if (v.date) {
+        status = 'Date locked in. Waiting on ' + more + '.';
+        body = '<div class="grid">' + cards(v.date, 'perk') + '</div>';
+      } else {
+        status = 'Build a date for ' + single + '. Pick 2 perks.';
+        body = hand(v.perks, 'perk');
+        action = '<button class="btn primary big" data-act="submit"' + (ready() ? '' : ' disabled') + '>Lock in this date</button>';
+      }
+    } else if (ph === 'sabotage') {
+      if (v.target && !v.myFlag) {
+        status = 'Now ruin ' + esc(v.target.name) + '\'s date. Pick a red flag.';
+        body = '<p class="lbl">' + esc(v.target.name) + '\'s date</p><div class="grid">' + cards(v.target.cards, 'perk') + '</div>' +
+          '<p class="lbl">Your red flags</p>' + hand(v.flags, 'flag');
+        action = '<button class="btn primary big" data-act="submit"' + (ready() ? '' : ' disabled') + '>Plant red flag</button>';
+      } else if (v.target) {
+        status = 'Red flag planted. Waiting on ' + more + '.';
+        body = '<p class="lbl">' + esc(v.target.name) + '\'s date, plus your gift</p><div class="grid">' + cards(v.target.cards, 'perk') + cards([v.myFlag], 'flag') + '</div>';
+      } else {
+        status = (amSingle ? 'Your dates are being sabotaged.' : 'The dates are being sabotaged.') + ' Waiting on ' + more + '.';
+      }
+    } else {
+      const result = ph === 'result';
+      if (result) {
+        status = single + ' chose ' + esc(name(v.winnerPid)) + '\'s date.';
+        action = (amSingle || amHost)
+          ? '<button class="btn primary big" data-act="next">Next round</button>'
+          : '<p class="note">Waiting for ' + single + ' to continue.</p>';
+      } else if (amSingle) {
+        status = 'Pick the date you could live with.';
+        action = '<button class="btn primary big" data-act="confirm"' + (pickIdx === null ? ' disabled' : '') + '>Choose this date</button>';
+      } else {
+        status = single + ' is choosing. Make your case!';
+      }
+      body = '<div class="dates">' + v.table.map((s, i) => {
+        const cls = 'date' + (result && s.pid === v.winnerPid ? ' win' : '') + (!result && pickIdx === i ? ' sel' : '');
+        const inner = '<div class="who">' + esc(name(s.pid)) + '\'s date</div>' + cards(s.cards, 'perk') +
+          (s.flag ? '<div class="but">but…</div>' + cards([s.flag], 'flag') : '') +
+          (result && s.by ? '<div class="by">Sabotaged by ' + esc(name(s.by)) + '</div>' : '');
+        return (!result && amSingle)
+          ? '<button class="' + cls + '" data-act="pick" data-i="' + i + '">' + inner + '</button>'
+          : '<div class="' + cls + '">' + inner + '</div>';
+      }).join('') + '</div>';
+    }
+
+    const step = ph === 'perks' ? 0 : ph === 'sabotage' ? 1 : 2;
+    const steps = ['Build a date from two perks', 'Plant a red flag on a rival', single + ' chooses'];
+    return '<header class="bar"><span>Room <b>' + esc(v.code) + '</b></span><span>Round ' + v.round + '</span><span>First to ' + v.goal + '</span></header>' +
+      scoresHTML() +
+      '<main class="table">' +
+      '<section class="prompt"><div class="brief"><h2>' + single + ' is looking for love.</h2><ol class="steps">' +
+      steps.map((s, i) => '<li class="' + (i === step ? 'on' : '') + '"><span>' + (i + 1) + '</span>' + s + '</li>').join('') +
+      '</ol></div></section>' +
+      '<section class="play"><p class="status">' + status + '</p>' + body + '<div class="action">' + action + '</div></section>' +
+      '</main>';
+  }
+
+  function overHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Game over</p>' +
+      '<div class="code small">' + esc(ranked[0].name) + ' wins</div>' +
+      '<ul class="plist rank">' + ranked.map((p, i) =>
+        '<li><span>' + (i + 1) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      (amHost
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
+          '<button class="btn" data-act="lobby">Back to lobby</button>'
+        : '<p class="note">Waiting for the host to start another game.</p>') +
+      '</main>';
+  }
+
+  /* ---------------- EVENTS ---------------- */
+  // Right number of cards picked, and every fill-in card has its word.
+  function ready() {
+    const sab = view.phase === 'sabotage', list = sab ? view.flags : view.perks;
+    return sel.length === (sab ? 1 : 2) && sel.every(i => !list[i].includes(BLANK) || (fillText[i] || '').trim());
+  }
+
+  function readName() {
+    myName = myName.trim().slice(0, 16);
+    if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
+    save('localStorage', 'db_name', myName);
+    homeErr = '';
+    return true;
+  }
+
+  $app.addEventListener('input', e => {
+    if (e.target.dataset.fill !== undefined) {
+      fillText[e.target.dataset.fill] = e.target.value;
+      const b = $app.querySelector('[data-act=submit]');
+      if (b) b.disabled = !ready();
+    }
+    if (e.target.id === 'name') myName = e.target.value;
+    if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+  });
+  $app.addEventListener('change', e => {
+    if (e.target.id === 'goal') act({ t: 'goal', goal: e.target.value });
+  });
+  $app.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'code') go('join');
+    if (e.key === 'Enter' && e.target.dataset.fill !== undefined) go('submit');
+  });
+  $app.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el && !el.disabled) go(el.dataset.act, el);
+  });
+
+  function go(a, el) {
+    const i = el && el.dataset.i !== undefined ? parseInt(el.dataset.i, 10) : null;
+    switch (a) {
+      case 'create':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (readName()) createRoom();
+        break;
+      case 'join':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (!readName()) return;
+        if (roomCode.length !== 5) { homeErr = 'Room codes are 5 letters.'; render(); return; }
+        joinRoom(roomCode);
+        break;
+      case 'copy': {
+        const url = shareUrl();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'), () => prompt('Copy this link:', url));
+        else prompt('Copy this link:', url);
+        break;
+      }
+      case 'start': act({ t: 'start' }); break;
+      case 'lobby': act({ t: 'lobby' }); break;
+      case 'sel': {
+        const max = view.phase === 'sabotage' ? 1 : 2;
+        const at = sel.indexOf(i);
+        if (at >= 0) sel.splice(at, 1);
+        else { if (sel.length >= max) sel.shift(); sel.push(i); }
+        render();
+        if (at < 0) { const box = document.getElementById('fill-' + i); if (box) box.focus(); }
+        break;
+      }
+      case 'submit':
+        if (!ready()) break;
+        if (view.phase === 'perks') act({ t: 'date', cards: sel.map(x => view.perks[x]), fills: sel.map(x => fillText[x] || '') });
+        else if (view.phase === 'sabotage') act({ t: 'flag', card: view.flags[sel[0]], fill: fillText[sel[0]] || '' });
+        break;
+      case 'pick': pickIdx = i; render(); break;
+      case 'confirm': if (pickIdx !== null) act({ t: 'pick', i: pickIdx }); break;
+      case 'next': act({ t: 'next' }); break;
+      case 'reconnect':
+        toast('Reconnecting…');
+        if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+        if (peer && !peer.destroyed) connectHost();
+        break;
+      case 'leave': location.href = location.pathname; break;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
