@@ -92,7 +92,7 @@ input::placeholder { color: #5d7090; font-weight: 400; }
 .plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
 .plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
 .plist.rank li { display: flex; justify-content: space-between; }
-.plist.rank li:first-child { background: var(--accent); color: #1a0d08; }
+.plist.rank li.top { background: var(--accent); color: #1a0d08; }
 
 .bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
 .bar b { color: var(--accent); letter-spacing: .1em; }
@@ -166,136 +166,191 @@ input[type=range] { width: 100%; margin: 6px 0 0; height: 44px; accent-color: va
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 /* =====================================================
-   THE SCALES. Edit freely. Each line is one scale:
-   ["left end", "right end"], with a comma after it.
+   THE SCALES, in packs. Edit freely.
+   Each line is one scale: ["left end", "right end"], with
+   a comma after it (except the last line of a pack).
+   The host picks a pack, or "Mixed", in the lobby. To add
+   a pack of your own, copy one whole block and give it a
+   new name: it shows up in the lobby by itself.
    ===================================================== */
-const SCALES = [
-  // personal: opinions, relationships, bad decisions
-  ["Green flag", "Red flag"],
-  ["Totally my type", "Not my type"],
-  ["Forgivable", "Unforgivable"],
-  ["Overrated", "Underrated"],
-  ["Fine on a first date", "Never on a first date"],
-  ["Tell everyone", "Take it to the grave"],
-  ["Waste of money", "Worth every penny"],
-  ["Mildly embarrassing", "Still can't talk about it"],
-  ["Bad idea", "Worst decision of my life"],
-  ["Slightly petty", "Completely unhinged"],
-  ["Not a crime", "Should be a crime"],
-  ["Turn-off", "Turn-on"],
-  ["Would do sober", "Only when drunk"],
-  ["Normal", "Weird"],
-  ["Easy to say", "Hard to say"],
-  ["Secretly love", "Loudly love"],
-  ["Just being friendly", "Definitely flirting"],
-  ["Not cheating", "Definitely cheating"],
-  ["Fine at work", "Fired on the spot"],
-  ["Useless skill", "Life-saving skill"],
-  ["Would forgive a friend", "Friendship over"],
-  ["Happy to lend", "Never lending that"],
-  ["Not worth leaving the house", "Worth queueing for"],
-  ["Tell my parents", "Never tell my parents"],
-  ["Tell my friends", "Never tell my friends"],
-  ["Small talk", "Deep talk"],
-  ["Relaxing", "Stressful"],
-  ["Harmless lie", "Dealbreaker lie"],
-  ["Unattractive habit", "Attractive habit"],
-  ["Would deny it", "Would brag about it"],
-  ["Introvert heaven", "Extrovert heaven"],
-  ["Terrible gift", "Perfect gift"],
-  ["Cringe", "Cool"],
-  ["Too soon in a relationship", "About time"],
-  ["Would do it for free", "Not for a million"],
-  ["Sign of love", "Sign of trouble"],
-  ["Needs an apology", "Needs a lawyer"],
-  ["Forgotten in a week", "Remembered forever"],
-  ["Keep it private", "Post it online"],
-  ["Easy to give up", "Could never give up"],
-  ["Happens to everyone", "Only happens to me"],
-  ["Rock bottom", "Peak of my life"],
-  ["Kid me would hate it", "Kid me would love it"],
-  ["Gives me the ick", "Makes me swoon"],
-  ["Would survive it", "Would not survive it"],
-  ["Awful hangover food", "Perfect hangover food"],
-  ["Fine at a wedding", "Banned from the wedding"],
-  ["Bare Minimum", "Princess Treatment"],
-  ["Boring", "Thrilling"],
-  ["Safe", "Dangerous"],
-  ["Rude", "Polite"],
-  ["Smells awful", "Smells amazing"],
-  ["Bad pet", "Great pet"],
-  ["Morning thing", "Midnight thing"],
-  ["Cheap date", "Expensive date"],
-  ["Not my problem", "Keeps me up at night"],
-  ["I'd tell my boss", "I'd tell nobody"],
-  ["Ideal Sunday", "Sunday ruined"],
-  ["Would try once", "Would never try"],
-  ["Low-key jealous", "Could not care less"],
-  ["Smash", "Pass"],
+const PACKS = {
+  "Personal": [
+    ["Green flag", "Red flag"],
+    ["Totally my type", "Not my type"],
+    ["Forgivable", "Unforgivable"],
+    ["Overrated", "Underrated"],
+    ["Fine on a first date", "Never on a first date"],
+    ["Tell everyone", "Take it to the grave"],
+    ["Waste of money", "Worth every penny"],
+    ["Mildly embarrassing", "Still can't talk about it"],
+    ["Bad idea", "Worst decision of my life"],
+    ["Slightly petty", "Completely unhinged"],
+    ["Not a crime", "Should be a crime"],
+    ["Turn-off", "Turn-on"],
+    ["Would do sober", "Only when drunk"],
+    ["Normal", "Weird"],
+    ["Easy to say", "Hard to say"],
+    ["Secretly love", "Loudly love"],
+    ["Just being friendly", "Definitely flirting"],
+    ["Not cheating", "Definitely cheating"],
+    ["Fine at work", "Fired on the spot"],
+    ["Useless skill", "Life-saving skill"],
+    ["Would forgive a friend", "Friendship over"],
+    ["Happy to lend", "Never lending that"],
+    ["Not worth leaving the house", "Worth queueing for"],
+    ["Tell my parents", "Never tell my parents"],
+    ["Tell my friends", "Never tell my friends"],
+    ["Small talk", "Deep talk"],
+    ["Relaxing", "Stressful"],
+    ["Harmless lie", "Dealbreaker lie"],
+    ["Unattractive habit", "Attractive habit"],
+    ["Would deny it", "Would brag about it"],
+    ["Introvert heaven", "Extrovert heaven"],
+    ["Terrible gift", "Perfect gift"],
+    ["Cringe", "Cool"],
+    ["Too soon in a relationship", "About time"],
+    ["Would do it for free", "Not for a million"],
+    ["Sign of love", "Sign of trouble"],
+    ["Needs an apology", "Needs a lawyer"],
+    ["Forgotten in a week", "Remembered forever"],
+    ["Keep it private", "Post it online"],
+    ["Easy to give up", "Could never give up"],
+    ["Happens to everyone", "Only happens to me"],
+    ["Rock bottom", "Peak of my life"],
+    ["Kid me would hate it", "Kid me would love it"],
+    ["Gives me the ick", "Makes me swoon"],
+    ["Would survive it", "Would not survive it"],
+    ["Awful hangover food", "Perfect hangover food"],
+    ["Fine at a wedding", "Banned from the wedding"],
+    ["Bare Minimum", "Princess Treatment"],
+    ["Boring", "Thrilling"],
+    ["Safe", "Dangerous"],
+    ["Rude", "Polite"],
+    ["Smells awful", "Smells amazing"],
+    ["Bad pet", "Great pet"],
+    ["Morning thing", "Midnight thing"],
+    ["Cheap date", "Expensive date"],
+    ["Not my problem", "Keeps me up at night"],
+    ["I'd tell my boss", "I'd tell nobody"],
+    ["Would try once", "Would never try"],
+    ["Low-key jealous", "Could not care less"],
+    ["Smash", "Pass"],
+    ["Controversial", "Uncontroversial"],
+  ],
 
-  // general: food, films, things, people
-  ["Breakfast food", "Dinner food"],
-  ["Belongs on a pizza", "Keep it off my pizza"],
-  ["Barely a snack", "A full meal"],
-  ["Comfort food", "Dare food"],
-  ["Worth the calories", "Not worth the calories"],
-  ["Lovely texture", "Horrible texture"],
-  ["Needs a sequel", "Should never have been made"],
-  ["Watch it alone", "Watch it with a crowd"],
-  ["Makes me cry", "Makes me laugh"],
-  ["Background music", "Stop everything and listen"],
-  ["Karaoke disaster", "Karaoke gold"],
-  ["Future classic", "Forgotten by next year"],
-  ["Aged like milk", "Aged like wine"],
-  ["All hype", "Worth the hype"],
-  ["Peaked years ago", "Timeless"],
-  ["Nostalgic", "Best left in the past"],
-  ["Lost art", "Good riddance"],
-  ["Tourist trap", "Hidden gem"],
-  ["Holiday from hell", "Trip of a lifetime"],
-  ["Beach holiday", "City break"],
-  ["Take it to a desert island", "Leave it at home"],
-  ["Nightmare job", "Dream job"],
-  ["Could do it in my sleep", "Would need a year of training"],
-  ["Born with it", "Had to learn it"],
-  ["Real sport", "Just a hobby"],
-  ["Down to skill", "Down to luck"],
-  ["Rip-off", "Bargain"],
-  ["Impulse buy", "Saved up for it"],
-  ["Everyone has one", "Nobody needs one"],
-  ["Quiet luxury", "Loud and proud"],
-  ["Underdressed", "Overdressed"],
-  ["Wear it to work", "Wear it to the club"],
-  ["Cosy", "Creepy"],
-  ["Cute", "Terrifying"],
-  ["Would pet it", "Would run from it"],
-  ["Soothing sound", "Unbearable sound"],
-  ["Lucky", "Cursed"],
-  ["Tiny problem", "Huge problem"],
-  ["Easy to explain", "Impossible to explain"],
-  ["Party killer", "Party starter"],
-  ["Sunday morning", "Saturday night"],
-  ["Fine over text", "Needs a phone call"],
-  ["Reply instantly", "Leave on read"],
-  ["Good first impression", "Bad first impression"],
-  ["Lives in my head rent-free", "Forgot it existed"],
-  ["Background extra", "Main character"],
-  ["Zombie apocalypse liability", "Zombie apocalypse asset"],
-  ["Would lose the fight", "Would win the fight"],
-  ["Name for a pet", "Name for a baby"],
-  ["Makes me feel young", "Makes me feel old"],
-  ["Early bird", "Night owl"],
-  ["Indoor person", "Outdoor person"],
-  ["Planner", "Wing it"],
-  ["Spender", "Saver"],
-  ["Team player", "Lone wolf"],
-  ["Head", "Heart"],
-  ["Talk it out", "Never mention it again"],
-  ["Tidy", "Chaos"],
-  ["Would read it", "Would never read it"],
-  ["I ship it", "Not my cup of tea"],
-  ["Would eat every day", "Would never eat it again"]
-];
+  "General": [
+    ["Breakfast food", "Dinner food"],
+    ["Belongs on a pizza", "Keep it off my pizza"],
+    ["Barely a snack", "A full meal"],
+    ["Comfort food", "Dare food"],
+    ["Worth the calories", "Not worth the calories"],
+    ["Lovely texture", "Horrible texture"],
+    ["Needs a sequel", "Should never have been made"],
+    ["Watch it alone", "Watch it with a crowd"],
+    ["Makes me cry", "Makes me laugh"],
+    ["Background music", "Stop everything and listen"],
+    ["Karaoke disaster", "Karaoke gold"],
+    ["Future classic", "Forgotten by next year"],
+    ["Aged like milk", "Aged like wine"],
+    ["All hype", "Worth the hype"],
+    ["Peaked years ago", "Timeless"],
+    ["Nostalgic", "Best left in the past"],
+    ["Lost art", "Good riddance"],
+    ["Tourist trap", "Hidden gem"],
+    ["Holiday from hell", "Trip of a lifetime"],
+    ["Take it to a desert island", "Leave it at home"],
+    ["Nightmare job", "Dream job"],
+    ["Could do it in my sleep", "Would need a year of training"],
+    ["Born with it", "Had to learn it"],
+    ["Real sport", "Just a hobby"],
+    ["Down to skill", "Down to luck"],
+    ["Rip-off", "Bargain"],
+    ["Impulse buy", "Saved up for it"],
+    ["Everyone has one", "Nobody needs one"],
+    ["Quiet luxury", "Loud and proud"],
+    ["Underdressed", "Overdressed"],
+    ["Wear it to work", "Wear it to the club"],
+    ["Cozy", "Creepy"],
+    ["Cute", "Terrifying"],
+    ["Would pet it", "Would run from it"],
+    ["Soothing sound", "Unbearable sound"],
+    ["Lucky", "Cursed"],
+    ["Tiny problem", "Huge problem"],
+    ["Easy to explain", "Impossible to explain"],
+    ["Party killer", "Party starter"],
+    ["Sunday morning", "Saturday night"],
+    ["Fine over text", "Needs a phone call"],
+    ["Reply instantly", "Leave on read"],
+    ["Good first impression", "Bad first impression"],
+    ["Lives in my head rent-free", "Forgot it existed"],
+    ["Background extra", "Main character"],
+    ["Zombie apocalypse liability", "Zombie apocalypse asset"],
+    ["Would lose the fight", "Would win the fight"],
+    ["Name for a pet", "Name for a baby"],
+    ["Makes me feel young", "Makes me feel old"],
+    ["Early bird", "Night owl"],
+    ["Indoor person", "Outdoor person"],
+    ["Planner", "Wing it"],
+    ["Spender", "Saver"],
+    ["Team player", "Lone wolf"],
+    ["Talk it out", "Never mention it again"],
+    ["Tidy", "Chaos"],
+    ["Would read it", "Would never read it"],
+    ["I ship it", "Not my cup of tea"],
+    ["Would eat every day", "Would never eat it again"]
+  ],
+
+  "Spicy": [
+    ["Wholesome", "Filthy"],
+    ["Vanilla", "Kinky"],
+    ["PG", "18+"],
+    ["Sweet nothing", "Dirty talk"],
+    ["Foreplay", "Mood killer"],
+    ["Pillow talk", "Never say that in bed"],
+    ["One-night stand", "Marriage material"],
+    ["Situationship", "Soulmate"],
+    ["Dump them", "Marry them"],
+    ["I can fix them", "Run"],
+    ["Would swipe left", "Would swipe right"],
+    ["Would kiss", "Would rather die"],
+    ["Hear me out", "Absolutely not"],
+    ["Flirty", "Creepy"],
+    ["Romantic", "Stalker behaviour"],
+    ["Cute jealous", "Scary jealous"],
+    ["Adorable quirk", "Toxic trait"],
+    ["Hot", "Hot mess"],
+    ["Delulu", "Realistic"],
+    ["Soft launch", "Hard launch"],
+    ["Meet the parents", "Hide from the parents"],
+    ["Would stay friends", "Blocked on everything"],
+    ["Would never text my ex", "Texting my ex right now"],
+    ["Walk of shame", "Stride of pride"],
+    ["Sexy job", "Unsexy job"],
+    ["Good in bed", "Only thinks they're good in bed"],
+    ["Big spoon", "Little spoon"],
+    ["Sober thought", "Three-drinks thought"],
+    ["Would whimper", "Would grunt"],
+    ["Good idea at 2 p.m.", "Good idea at 2 a.m."],
+    ["Cute drunk", "Messy drunk"],
+    ["Great hangover story", "Never drinking again"],
+    ["Worth the hangover", "Not worth the hangover"],
+    ["Would do on a dare", "Would do unprompted"],
+    ["Would do for love", "Would only do for money"],
+    ["Would lie about it", "Would put it on my CV"],
+    ["Safe to search", "Clear your history"],
+    ["Tell my therapist", "Not even my therapist"],
+    ["Cheeky", "Illegal"],
+    ["Deserves a medal", "Deserves jail"],
+    ["Mild take", "Start-a-fight take"],
+    ["God willing", "God forbid"],
+    ["Slay", "Flop"],
+    ["Smells sexy", "Smells like regret"],
+    ["Would date the hero", "Would date the villain"]
+  ]
+};
+
+// Every pack together, for the "Mixed" setting.
+const SCALES = [].concat(...Object.values(PACKS));
 
 /* =====================================================
    THE GAME. The player who creates the room is the host:
@@ -348,6 +403,7 @@ const SCALES = [
         code, phase: 'lobby', laps: 2,
         giverScores: load('localStorage', 'ti_gscore') !== '0',     // lobby settings start as the host last left them
         live: load('localStorage', 'ti_live') === '1',
+        pack: PACKS[load('localStorage', 'ti_pack')] ? load('localStorage', 'ti_pack') : '',     // '' means Mixed
         total: 0, round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, guess: null, pos: null, pts: 0, conn: null, connected: true }],
         giverPid: null, scale: null, target: null, gain: 0, deck: []
@@ -403,8 +459,11 @@ const SCALES = [
     sync();
   }
 
+  // The scales in play: one pack, or all of them when the setting is "Mixed".
+  const scales = () => (G.pack && PACKS[G.pack] && PACKS[G.pack].length) ? PACKS[G.pack] : SCALES;
+
   function deal() {
-    if (!G.deck.length) G.deck = shuffle(SCALES);
+    if (!G.deck.length) G.deck = shuffle(scales());
     G.scale = G.deck.pop();
     G.target = 5 + Math.floor(Math.random() * 91);          // 5 to 95
     G.players.forEach(p => { p.pos = null; });              // sliders start again in the middle
@@ -413,7 +472,7 @@ const SCALES = [
   function startGame() {
     G.players = G.players.filter(p => p.connected);
     G.players.forEach(p => { p.score = 0; });
-    G.deck = shuffle(SCALES);
+    G.deck = shuffle(scales());
     G.round = 0; G.giverPid = null;
     G.total = G.laps * G.players.length;
     startRound();
@@ -472,6 +531,9 @@ const SCALES = [
       case 'giverScores':
         if (amHost && G.phase === 'lobby') { G.giverScores = !!msg.on; sync(); }
         break;
+      case 'pack':
+        if (amHost && G.phase === 'lobby') { G.pack = PACKS[msg.pack] ? msg.pack : ''; sync(); }
+        break;
       case 'watch':
         if (amHost && G.phase === 'lobby') { G.live = !!msg.on; sync(); }
         break;
@@ -519,7 +581,7 @@ const SCALES = [
     const me = P(pid), open = G.phase === 'reveal';
     const watch = G.live && G.phase === 'clue' && pid === G.giverPid;   // only the clue giver gets slider positions
     return {
-      code: G.code, phase: G.phase, laps: G.laps, giverScores: G.giverScores, live: G.live, total: G.total, round: G.round,
+      code: G.code, phase: G.phase, laps: G.laps, giverScores: G.giverScores, live: G.live, pack: G.pack, total: G.total, round: G.round,
       you: pid, hostPid: G.hostPid, giverPid: G.giverPid, scale: G.scale,
       target: (open || pid === G.giverPid) ? G.target : null,
       gain: G.gain, myGuess: me ? me.guess : null,
@@ -732,6 +794,10 @@ const SCALES = [
         ? '<label class="field inline"><span>Clues each</span>' +
           '<input id="laps" type="text" inputmode="numeric" maxlength="2" autocomplete="off" value="' + v.laps + '">' +
           '<em class="dim">1 to ' + MAX_LAPS + ' · ' + (v.laps * n) + ' rounds</em></label>' +
+          '<label class="field inline"><span>Scales</span><select id="pack">' +
+          '<option value=""' + (v.pack ? '' : ' selected') + '>Mixed (' + SCALES.length + ')</option>' +
+          Object.keys(PACKS).map(k => '<option value="' + esc(k) + '"' + (v.pack === k ? ' selected' : '') + '>' + esc(k) + ' (' + PACKS[k].length + ')</option>').join('') +
+          '</select></label>' +
           '<label class="field inline"><span>Clue giver scores</span><select id="gscore">' +
           '<option value="1"' + (v.giverScores ? ' selected' : '') + '>Yes, the average guess</option>' +
           '<option value="0"' + (v.giverScores ? '' : ' selected') + '>No, only guessers</option></select></label>' +
@@ -743,7 +809,8 @@ const SCALES = [
           '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
         : '<p class="note">Waiting for the host to start. Everyone gives ' + v.laps + ' clue' + (v.laps > 1 ? 's' : '') + '. ' +
           (v.giverScores ? 'The clue giver scores the average of the guesses.' : 'Only guessers score.') + ' ' +
-          (v.live ? 'The clue giver can watch the sliders live.' : 'Guesses are hidden until the reveal.') + '</p>') +
+          (v.live ? 'The clue giver can watch the sliders live.' : 'Guesses are hidden until the reveal.') +
+          ' Scales: ' + (v.pack ? esc(v.pack) : 'Mixed') + '.</p>') +
       '</main>';
   }
 
@@ -791,7 +858,7 @@ const SCALES = [
 
     if (v.phase === 'clue') {
       if (amGiver) {
-        body = '<p class="status">Only you can see the target. Say one clue out loud that belongs right there.</p>' +
+        body = '<p class="status">Only you can see the target. Say some clues that belong right there.</p>' +
           '<p class="tip">Make it personal: something you\'ve done, own, love or can\'t stand. Don\'t use the words on the scale, and don\'t hint at left or right.</p>' +
           (v.live ? '<p class="tip">You can watch their sliders move while they decide. Faded pins are not locked in yet.</p>' : '') +
           scaleHTML(v.target, v.live ? v.players.filter(p => typeof p.pos === 'number').map(p =>
@@ -831,11 +898,17 @@ const SCALES = [
   function overHTML() {
     const v = view, amHost = v.you === v.hostPid;
     const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    // Everyone on the top score shares the win, and equal scores share a place.
+    const winners = ranked.filter(p => p.score === ranked[0].score).map(p => esc(p.name));
+    const headline = winners.length === 1 ? winners[0] + ' wins'
+      : (winners.length === ranked.length && ranked.length > 2) ? 'Everyone ties'
+      : winners.slice(0, -1).join(', ') + ' and ' + winners[winners.length - 1] + ' tie';
+    const place = p => ranked.findIndex(x => x.score === p.score) + 1;
     return '<main class="lobby">' +
       '<p class="eyebrow">Game over</p>' +
-      '<div class="code small">' + esc(ranked[0].name) + ' wins</div>' +
-      '<ul class="plist rank">' + ranked.map((p, i) =>
-        '<li><span>' + (i + 1) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      '<div class="code small">' + headline + '</div>' +
+      '<ul class="plist rank">' + ranked.map(p =>
+        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
       (amHost
         ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
           '<button class="btn" data-act="lobby">Back to lobby</button>'
@@ -880,6 +953,7 @@ const SCALES = [
   });
   $app.addEventListener('change', e => {
     if (e.target.id === 'gscore') { save('localStorage', 'ti_gscore', e.target.value); act({ t: 'giverScores', on: e.target.value === '1' }); }
+    if (e.target.id === 'pack') { save('localStorage', 'ti_pack', e.target.value); act({ t: 'pack', pack: e.target.value }); }
     if (e.target.id === 'watch') { save('localStorage', 'ti_live', e.target.value); act({ t: 'watch', on: e.target.value === '1' }); }
     if (e.target.id === 'laps' && !e.target.value) e.target.value = view.laps;   // left empty: put the current number back
   });
