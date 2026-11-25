@@ -47,6 +47,24 @@ input[type=text], input:not([type]), select { width: 100%; background: var(--pan
 select { width: auto; }
 input::placeholder { color: #5d7090; font-weight: 400; }
 
+.howto { margin-top: 28px; }
+.howto h2 { margin: 0; font-size: 1.1rem; }
+.howto .note { margin: 2px 0 0; }
+.step { background: var(--panel); border-radius: var(--radius); overflow: hidden; margin-top: 12px; }
+.step svg { display: block; width: 100%; height: auto; background: #132238; }
+.step svg text { font: 700 13px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.step svg .s-sm { font-size: 11px; }
+.step svg .s-cool { fill: var(--cool); }
+.step svg .s-acc { fill: var(--accent); }
+.step svg .s-ink { fill: var(--ink); }
+.step svg .s-dim { fill: var(--dim); }
+.step svg .s-dark { fill: #1a0d08; }
+.step svg .s-bubble { fill: #263b5e; }
+.step svg .s-track { stroke: var(--line); stroke-width: 2; }
+.step svg .s-rail { stroke: var(--line); stroke-width: 4; stroke-linecap: round; }
+.step svg .s-pin { stroke: var(--bg); stroke-width: 1.5; }
+.step p { margin: 0; padding: 12px 14px 14px; display: flex; gap: 10px; font-size: .95rem; }
+.step p b { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #1a0d08; display: grid; place-items: center; font-size: .8rem; }
 .home, .lobby { max-width: 420px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
 .logo { font-size: clamp(3.2rem, 17vw, 5rem); line-height: .9; letter-spacing: -.04em; margin: 0; font-weight: 900; }
 .logo i { font-style: normal; color: var(--accent); }
@@ -148,6 +166,7 @@ input[type=range] { width: 100%; margin: 6px 0 0; height: 44px; accent-color: va
    ["left end", "right end"], with a comma after it.
    ===================================================== */
 const SCALES = [
+  // personal: opinions, relationships, bad decisions
   ["Green flag", "Red flag"],
   ["Forgivable", "Unforgivable"],
   ["Overrated", "Underrated"],
@@ -171,6 +190,7 @@ const SCALES = [
   ["Happy to lend", "Never lending that"],
   ["Not worth leaving the house", "Worth queueing for"],
   ["Tell my parents", "Never tell my parents"],
+  ["Tell my friends", "Never tell my friends"],
   ["Small talk", "Deep talk"],
   ["Relaxing", "Stressful"],
   ["Harmless lie", "Dealbreaker lie"],
@@ -178,8 +198,6 @@ const SCALES = [
   ["Would deny it", "Would brag about it"],
   ["Introvert heaven", "Extrovert heaven"],
   ["Terrible gift", "Perfect gift"],
-  ["Fun for an hour", "Fun forever"],
-  ["Trashy", "Classy"],
   ["Cringe", "Cool"],
   ["Too soon in a relationship", "About time"],
   ["Would do it for free", "Not for a million"],
@@ -195,7 +213,7 @@ const SCALES = [
   ["Would survive it", "Would not survive it"],
   ["Awful hangover food", "Perfect hangover food"],
   ["Fine at a wedding", "Banned from the wedding"],
-  ["Zero effort", "Maximum effort"],
+  ["Bare Minimum", "Princess Treatment"],
   ["Boring", "Thrilling"],
   ["Safe", "Dangerous"],
   ["Rude", "Polite"],
@@ -207,7 +225,67 @@ const SCALES = [
   ["I'd tell my boss", "I'd tell nobody"],
   ["Ideal Sunday", "Sunday ruined"],
   ["Would try once", "Would never try"],
-  ["Low-key jealous", "Could not care less"]
+  ["Low-key jealous", "Could not care less"],
+
+  // general: food, films, things, people
+  ["Breakfast food", "Dinner food"],
+  ["Belongs on a pizza", "Keep it off my pizza"],
+  ["Barely a snack", "A full meal"],
+  ["Comfort food", "Dare food"],
+  ["Worth the calories", "Not worth the calories"],
+  ["Lovely texture", "Horrible texture"],
+  ["Needs a sequel", "Should never have been made"],
+  ["Watch it alone", "Watch it with a crowd"],
+  ["Makes me cry", "Makes me laugh"],
+  ["Background music", "Stop everything and listen"],
+  ["Karaoke disaster", "Karaoke gold"],
+  ["Future classic", "Forgotten by next year"],
+  ["Aged like milk", "Aged like wine"],
+  ["All hype", "Worth the hype"],
+  ["Peaked years ago", "Timeless"],
+  ["Nostalgic", "Best left in the past"],
+  ["Lost art", "Good riddance"],
+  ["Tourist trap", "Hidden gem"],
+  ["Holiday from hell", "Trip of a lifetime"],
+  ["Beach holiday", "City break"],
+  ["Take it to a desert island", "Leave it at home"],
+  ["Nightmare job", "Dream job"],
+  ["Could do it in my sleep", "Would need a year of training"],
+  ["Born with it", "Had to learn it"],
+  ["Real sport", "Just a hobby"],
+  ["Down to skill", "Down to luck"],
+  ["Rip-off", "Bargain"],
+  ["Impulse buy", "Saved up for it"],
+  ["Everyone has one", "Nobody needs one"],
+  ["Quiet luxury", "Loud and proud"],
+  ["Underdressed", "Overdressed"],
+  ["Wear it to work", "Wear it to the club"],
+  ["Cosy", "Creepy"],
+  ["Cute", "Terrifying"],
+  ["Would pet it", "Would run from it"],
+  ["Soothing sound", "Unbearable sound"],
+  ["Lucky", "Cursed"],
+  ["Tiny problem", "Huge problem"],
+  ["Easy to explain", "Impossible to explain"],
+  ["Party killer", "Party starter"],
+  ["Sunday morning", "Saturday night"],
+  ["Fine over text", "Needs a phone call"],
+  ["Reply instantly", "Leave on read"],
+  ["Good first impression", "Bad first impression"],
+  ["Lives in my head rent-free", "Forgot it existed"],
+  ["Background extra", "Main character"],
+  ["Zombie apocalypse liability", "Zombie apocalypse asset"],
+  ["Would lose the fight", "Would win the fight"],
+  ["Name for a pet", "Name for a baby"],
+  ["Makes me feel young", "Makes me feel old"],
+  ["Early bird", "Night owl"],
+  ["Indoor person", "Outdoor person"],
+  ["Planner", "Wing it"],
+  ["Spender", "Saver"],
+  ["Team player", "Lone wolf"],
+  ["Head", "Heart"],
+  ["Talk it out", "Never mention it again"],
+  ["Tidy", "Chaos"]
 ];
 
 /* =====================================================
@@ -513,6 +591,71 @@ const SCALES = [
     $app.innerHTML = html;
   }
 
+  // The "how to play" pictures on the home screen. They are drawn as SVG so the game stays one file.
+  const HOWTO = `
+    <section class="howto">
+      <h2>How to play</h2>
+      <p class="note">Get everyone on a call, then:</p>
+
+      <div class="step">
+        <svg viewBox="0 0 280 110" aria-hidden="true">
+          <defs><linearGradient id="howgrad" x1="0" x2="1">
+            <stop offset="0" stop-color="#4fd1c5" stop-opacity=".35"/><stop offset="1" stop-color="#ff7a59" stop-opacity=".35"/>
+          </linearGradient></defs>
+          <text x="16" y="26" class="s-cool">Forgivable</text>
+          <text x="264" y="26" text-anchor="end" class="s-acc">Unforgivable</text>
+          <rect x="16" y="36" width="248" height="44" rx="9" fill="url(#howgrad)" class="s-track"/>
+          <rect x="138" y="37" width="84" height="42" fill="#fff" opacity=".16"/>
+          <rect x="155" y="37" width="50" height="42" fill="#fff" opacity=".3"/>
+          <rect x="170" y="37" width="20" height="42" fill="#fff"/>
+          <text x="180" y="100" text-anchor="middle" class="s-dim s-sm">secret target</text>
+        </svg>
+        <p><b>1</b><span>One friend is the clue giver. They see a scale with a secret target on it.</span></p>
+      </div>
+
+      <div class="step">
+        <svg viewBox="0 0 280 110" aria-hidden="true">
+          <circle cx="42" cy="55" r="20" class="s-acc"/>
+          <text x="42" y="60" text-anchor="middle" class="s-dark">S</text>
+          <path d="M76 55 l16 -9 v18 z" class="s-bubble"/>
+          <rect x="90" y="25" width="176" height="60" rx="14" class="s-bubble"/>
+          <text x="178" y="51" text-anchor="middle" class="s-ink">“Reading my</text>
+          <text x="178" y="69" text-anchor="middle" class="s-ink">partner's texts”</text>
+        </svg>
+        <p><b>2</b><span>They say one clue out loud that belongs at that spot. Personal clues are the best ones.</span></p>
+      </div>
+
+      <div class="step">
+        <svg viewBox="0 0 280 110" aria-hidden="true">
+          <text x="16" y="22" class="s-cool">Forgivable</text>
+          <text x="264" y="22" text-anchor="end" class="s-acc">Unforgivable</text>
+          <rect x="16" y="32" width="248" height="38" rx="9" fill="url(#howgrad)" class="s-track"/>
+          <rect x="197" y="27" width="5" height="48" rx="2" class="s-acc"/>
+          <line x1="20" y1="92" x2="260" y2="92" class="s-rail"/>
+          <circle cx="199" cy="92" r="10" class="s-acc"/>
+        </svg>
+        <p><b>3</b><span>Everyone else talks it over, then slides to where they think the target is.</span></p>
+      </div>
+
+      <div class="step">
+        <svg viewBox="0 0 280 110" aria-hidden="true">
+          <text x="16" y="20" class="s-cool s-sm">Forgivable</text>
+          <text x="264" y="20" text-anchor="end" class="s-acc s-sm">Unforgivable</text>
+          <rect x="16" y="28" width="248" height="44" rx="9" fill="url(#howgrad)" class="s-track"/>
+          <rect x="138" y="29" width="84" height="42" fill="#fff" opacity=".16"/>
+          <rect x="155" y="29" width="50" height="42" fill="#fff" opacity=".3"/>
+          <rect x="170" y="29" width="20" height="42" fill="#fff"/>
+          <rect x="68" y="23" width="5" height="54" rx="2" class="s-ink s-pin"/>
+          <rect x="140" y="23" width="5" height="54" rx="2" class="s-ink s-pin"/>
+          <rect x="179" y="23" width="6" height="54" rx="2" class="s-acc s-pin"/>
+          <text x="70" y="96" text-anchor="middle" class="s-dim s-sm">Preme 0</text>
+          <text x="140" y="96" text-anchor="middle" class="s-ink s-sm">Moji +2</text>
+          <text x="186" y="96" text-anchor="middle" class="s-acc s-sm">You +4</text>
+        </svg>
+        <p><b>4</b><span>The target is revealed. Closer guesses score more, and the clue giver tells the story behind the clue.</span></p>
+      </div>
+    </section>`;
+
   function homeHTML() {
     const dis = busy ? ' disabled' : '';
     return '<main class="home">' +
@@ -526,11 +669,8 @@ const SCALES = [
       '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
       (busy ? '<p class="note">' + esc(busy) + '</p>' : '') +
       (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
-      '<ol class="how"><li>Get everyone on a call. Each round one friend sees a scale, like "Forgivable" to "Unforgivable", with a secret target somewhere on it.</li>' +
-      '<li>They say one clue out loud that belongs at that spot. The best clues are personal: something they\'ve done, love or can\'t stand.</li>' +
-      '<li>Everyone else argues it out, then slides to where they think the target is. Closer is better.</li>' +
-      '<li>The target is revealed and the clue giver explains themselves.</li></ol>' +
       '<p class="fine">' + MIN_PLAYERS + ' to ' + MAX_PLAYERS + ' players, each on their own phone or laptop.</p>' +
+      HOWTO +
       '</main>';
   }
 
