@@ -43,6 +43,8 @@ button, input, select { font: inherit; color: inherit; }
 .field span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 6px; }
 .field.inline { display: flex; align-items: center; gap: 12px; }
 .field.inline span { margin: 0; }
+.field.inline input { width: 72px; text-align: center; }
+.field.inline em { font-style: normal; font-size: .85rem; }
 input[type=text], input:not([type]), select { width: 100%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
 select { width: auto; }
 input::placeholder { color: #5d7090; font-weight: 400; }
@@ -299,6 +301,7 @@ const SCALES = [
 
   const PREFIX = 'tunedin-v1-';
   const MIN_PLAYERS = 3, MAX_PLAYERS = 12;
+  const MAX_LAPS = 20;                             // most clues each player can be set to give
   const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const ZONES = [[4, 4], [10, 3], [17, 2]];        // [distance from target, points]
   const points = d => { for (const [w, p] of ZONES) if (d <= w) return p; return 0; };
@@ -452,7 +455,7 @@ const SCALES = [
     const amHost = pid === G.hostPid, amGiver = pid === G.giverPid;
     switch (msg.t) {
       case 'laps':
-        if (amHost && G.phase === 'lobby') { G.laps = Math.min(5, Math.max(1, parseInt(msg.laps, 10) || 2)); sync(); }
+        if (amHost && G.phase === 'lobby') { G.laps = Math.min(MAX_LAPS, Math.max(1, parseInt(msg.laps, 10) || 2)); sync(); }
         break;
       case 'start':
         if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
@@ -588,7 +591,10 @@ const SCALES = [
         '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button>' +
         '<button class="btn" data-act="leave">Leave</button></div></div></div>';
     }
+    // keep the cursor in place if the screen refreshes while the host is typing
+    const a = document.activeElement, id = a && a.id, pos = a && a.selectionStart;
     $app.innerHTML = html;
+    if (id) { const el = document.getElementById(id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } }
   }
 
   // The "how to play" pictures on the home screen. They are drawn as SVG so the game stays one file.
@@ -619,7 +625,7 @@ const SCALES = [
           <text x="42" y="60" text-anchor="middle" class="s-dark">S</text>
           <path d="M76 55 l16 -9 v18 z" class="s-bubble"/>
           <rect x="90" y="25" width="176" height="60" rx="14" class="s-bubble"/>
-          <text x="178" y="51" text-anchor="middle" class="s-ink">“Eat all my</text>
+          <text x="178" y="51" text-anchor="middle" class="s-ink">“Eating all my</text>
           <text x="178" y="69" text-anchor="middle" class="s-ink">cat's food”</text>
         </svg>
         <p><b>2</b><span>They say one clue out loud that belongs at that spot. Personal clues are the best ones.</span></p>
@@ -676,7 +682,6 @@ const SCALES = [
 
   function lobbyHTML() {
     const v = view, amHost = v.you === v.hostPid, n = v.players.length;
-    const laps = [1, 2, 3].map(g => '<option value="' + g + '"' + (g === v.laps ? ' selected' : '') + '>' + g + ' each</option>').join('');
     return '<main class="lobby">' +
       '<p class="eyebrow">Room code</p>' +
       '<div class="code">' + esc(v.code) + '</div>' +
@@ -685,7 +690,9 @@ const SCALES = [
       '<ul class="plist">' + v.players.map(p =>
         '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
       (amHost
-        ? '<label class="field inline"><span>Clues each</span><select id="laps">' + laps + '</select></label>' +
+        ? '<label class="field inline"><span>Clues each</span>' +
+          '<input id="laps" type="text" inputmode="numeric" maxlength="2" autocomplete="off" value="' + v.laps + '">' +
+          '<em class="dim">1 to ' + MAX_LAPS + ' · ' + (v.laps * n) + ' rounds</em></label>' +
           '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
           (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
           '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
@@ -795,6 +802,12 @@ const SCALES = [
   $app.addEventListener('input', e => {
     if (e.target.id === 'name') myName = e.target.value;
     if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+    if (e.target.id === 'laps') {              // typed, not picked: digits only, capped at the maximum
+      const digits = e.target.value.replace(/\D/g, '');
+      const n = Math.min(MAX_LAPS, parseInt(digits, 10) || 0);
+      e.target.value = n ? String(n) : '';
+      if (n) act({ t: 'laps', laps: n });
+    }
     if (e.target.id === 'dial') {
       myPos = parseInt(e.target.value, 10);
       const pin = document.getElementById('me');
@@ -802,7 +815,7 @@ const SCALES = [
     }
   });
   $app.addEventListener('change', e => {
-    if (e.target.id === 'laps') act({ t: 'laps', laps: e.target.value });
+    if (e.target.id === 'laps' && !e.target.value) e.target.value = view.laps;   // left empty: put the current number back
   });
   $app.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.id === 'code') go('join');
