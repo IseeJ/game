@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuned In — how well can your friends read you?</title>
+<meta name="description" content="One friend gets a secret spot on a scale and gives a clue. Everyone else guesses where it sits. Play over a call with a room code.">
+<style>
+:root {
+  --bg: #0f1b2d;
+  --panel: #18283f;
+  --line: #2b3f5c;
+  --ink: #f2f6fb;
+  --dim: #93a4bd;
+  --accent: #ff7a59;
+  --cool: #4fd1c5;
+  --radius: 16px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--cool); outline-offset: 2px; }
+
+.btn {
+  appearance: none; border: 2px solid var(--line); background: transparent;
+  font-weight: 700; padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  transition: transform .08s, background .15s, border-color .15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a0d08; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.btn.big { padding: 14px 24px; font-size: 1.05rem; }
+.btn.small { padding: 6px 14px; font-size: .9rem; }
+.field { display: block; text-align: left; margin: 0 0 14px; }
+.field span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 6px; }
+.field.inline { display: flex; align-items: center; gap: 12px; }
+.field.inline span { margin: 0; }
+input[type=text], input:not([type]), select { width: 100%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
+select { width: auto; }
+input::placeholder { color: #5d7090; font-weight: 400; }
+
+.home, .lobby { max-width: 420px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+.logo { font-size: clamp(3.2rem, 17vw, 5rem); line-height: .9; letter-spacing: -.04em; margin: 0; font-weight: 900; }
+.logo i { font-style: normal; color: var(--accent); }
+.tag { color: var(--dim); margin: 4px 0 20px; font-size: 1.05rem; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: .85rem; margin: 8px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.joinrow { display: flex; gap: 10px; }
+.joinrow input { text-transform: uppercase; letter-spacing: .3em; font-size: 1.2rem; text-align: center; }
+.note { color: var(--dim); margin: 8px 0 0; }
+.err { color: #ff8fa3; font-weight: 700; margin: 8px 0 0; }
+.fine { color: var(--dim); font-size: .85rem; margin: 16px 0 0; }
+.how { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font-size: .92rem; }
+.how li { margin-bottom: 4px; }
+.lobby { text-align: center; align-items: center; }
+.lobby > * { width: 100%; }
+.lobby > .btn.small { width: auto; }
+.eyebrow { margin: 0; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+.code { font-size: clamp(3rem, 16vw, 4.5rem); font-weight: 900; letter-spacing: .12em; color: var(--accent); line-height: 1; margin-bottom: 4px; }
+.code.small { font-size: 2.2rem; letter-spacing: 0; }
+.lobby h2 { margin: 24px 0 0; font-size: 1.1rem; text-align: left; }
+.dim { color: var(--dim); font-weight: 400; }
+.plist { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
+.plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
+.plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
+.plist.rank li { display: flex; justify-content: space-between; }
+.plist.rank li:first-child { background: var(--accent); color: #1a0d08; }
+
+.bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
+.bar b { color: var(--accent); letter-spacing: .1em; }
+.scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
+.scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 2px solid transparent; border-radius: 999px; padding: 6px 8px 6px 14px; font-size: .9rem; }
+.scores li.me .nm { text-decoration: underline; text-underline-offset: 3px; }
+.scores li.giver { border-color: var(--accent); }
+.scores li.off { opacity: .4; }
+.scores .mk { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.scores b { background: var(--bg); border-radius: 999px; min-width: 26px; text-align: center; padding: 2px 6px; }
+
+.stage { max-width: 640px; margin: 0 auto; padding: 12px 20px 130px; }
+.status { margin: 8px 0 0; font-size: 1.15rem; font-weight: 700; }
+.tip { margin: 8px 0 0; color: var(--dim); font-size: .92rem; }
+
+/* the scale */
+.scale { margin: 26px 0 0; }
+.ends { display: flex; justify-content: space-between; gap: 16px; font-weight: 900; font-size: 1.15rem; line-height: 1.15; }
+.ends span { max-width: 46%; }
+.ends span:last-child { text-align: right; color: var(--accent); }
+.ends span:first-child { color: var(--cool); }
+.track {
+  position: relative; height: 64px; margin: 12px 0 0; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(90deg, rgba(79, 209, 197, .28), rgba(255, 122, 89, .28));
+  border: 2px solid var(--line);
+}
+.band { position: absolute; top: 0; bottom: 0; }
+.band.z2 { background: rgba(255, 255, 255, .16); }
+.band.z3 { background: rgba(255, 255, 255, .3); }
+.band.z4 { background: #fff; }
+.pins { position: relative; height: 0; }
+.pin { position: absolute; top: -70px; width: 4px; height: 70px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+.pin.me { background: var(--accent); width: 6px; margin-left: -3px; }
+.pin span { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); font-size: .72rem; font-weight: 700; white-space: nowrap; background: var(--panel); padding: 1px 6px; border-radius: 6px; }
+.pin.up span { top: 92px; }
+.pad { height: 44px; }
+input[type=range] { width: 100%; margin: 6px 0 0; height: 44px; accent-color: var(--accent); background: none; border: 0; padding: 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 0; font-size: .8rem; color: var(--dim); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+.rows { list-style: none; margin: 18px 0 0; padding: 0; }
+.rows li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; background: var(--panel); border-radius: 12px; margin-top: 6px; }
+.rows li b { color: var(--accent); }
+.rows li.top { outline: 2px solid var(--accent); }
+.story { margin: 18px 0 0; background: var(--panel); border: 2px solid var(--cool); border-radius: var(--radius); padding: 16px; }
+.story p { margin: 0; }
+.story .lbl { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--cool); margin-bottom: 6px; }
+.action { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 799px) {
+  .action:not(:empty) { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); z-index: 5; }
+  .action .btn { flex: 1; }
+}
+
+.overlay { position: fixed; inset: 0; background: rgba(5, 10, 20, .8); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--panel); border-radius: var(--radius); padding: 24px; max-width: 380px; }
+.dialog h2 { margin: 0 0 8px; }
+.dialog p { color: var(--dim); margin: 0 0 18px; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: #111; font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- PeerJS: browser-to-browser connections, no server of your own needed -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+/* =====================================================
+   THE SCALES. Edit freely. Each line is one scale:
+   ["left end", "right end"], with a comma after it.
+   ===================================================== */
+const SCALES = [
+  ["Green flag", "Red flag"],
+  ["Forgivable", "Unforgivable"],
+  ["Overrated", "Underrated"],
+  ["Fine on a first date", "Never on a first date"],
+  ["Tell everyone", "Take it to the grave"],
+  ["Waste of money", "Worth every penny"],
+  ["Mildly embarrassing", "Still can't talk about it"],
+  ["Bad idea", "Worst decision of my life"],
+  ["Slightly petty", "Completely unhinged"],
+  ["Not a crime", "Should be a crime"],
+  ["Turn-off", "Turn-on"],
+  ["Would do sober", "Only when drunk"],
+  ["Normal", "Weird"],
+  ["Easy to say", "Hard to say"],
+  ["Secretly love", "Loudly love"],
+  ["Just being friendly", "Definitely flirting"],
+  ["Not cheating", "Definitely cheating"],
+  ["Fine at work", "Fired on the spot"],
+  ["Useless skill", "Life-saving skill"],
+  ["Would forgive a friend", "Friendship over"],
+  ["Happy to lend", "Never lending that"],
+  ["Not worth leaving the house", "Worth queueing for"],
+  ["Tell my parents", "Never tell my parents"],
+  ["Small talk", "Deep talk"],
+  ["Relaxing", "Stressful"],
+  ["Harmless lie", "Dealbreaker lie"],
+  ["Unattractive habit", "Attractive habit"],
+  ["Would deny it", "Would brag about it"],
+  ["Introvert heaven", "Extrovert heaven"],
+  ["Terrible gift", "Perfect gift"],
+  ["Fun for an hour", "Fun forever"],
+  ["Trashy", "Classy"],
+  ["Cringe", "Cool"],
+  ["Too soon in a relationship", "About time"],
+  ["Would do it for free", "Not for a million"],
+  ["Sign of love", "Sign of trouble"],
+  ["Needs an apology", "Needs a lawyer"],
+  ["Forgotten in a week", "Remembered forever"],
+  ["Keep it private", "Post it online"],
+  ["Easy to give up", "Could never give up"],
+  ["Happens to everyone", "Only happens to me"],
+  ["Rock bottom", "Peak of my life"],
+  ["Kid me would hate it", "Kid me would love it"],
+  ["Gives me the ick", "Makes me swoon"],
+  ["Would survive it", "Would not survive it"],
+  ["Awful hangover food", "Perfect hangover food"],
+  ["Fine at a wedding", "Banned from the wedding"],
+  ["Zero effort", "Maximum effort"],
+  ["Boring", "Thrilling"],
+  ["Safe", "Dangerous"],
+  ["Rude", "Polite"],
+  ["Smells awful", "Smells amazing"],
+  ["Bad pet", "Great pet"],
+  ["Morning thing", "Midnight thing"],
+  ["Cheap date", "Expensive date"],
+  ["Not my problem", "Keeps me up at night"],
+  ["I'd tell my boss", "I'd tell nobody"],
+  ["Ideal Sunday", "Sunday ruined"],
+  ["Would try once", "Would never try"],
+  ["Low-key jealous", "Could not care less"]
+];
+
+/* =====================================================
+   THE GAME. The player who creates the room is the host:
+   their browser holds the real game state and sends each
+   player only what they are allowed to see. Only the clue
+   giver is sent the target before the reveal.
+   ===================================================== */
+(() => {
+  'use strict';
+
+  const PREFIX = 'tunedin-v1-';
+  const MIN_PLAYERS = 3, MAX_PLAYERS = 12;
+  const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const ZONES = [[4, 4], [10, 3], [17, 2]];        // [distance from target, points]
+  const points = d => { for (const [w, p] of ZONES) if (d <= w) return p; return 0; };
+
+  const $app = document.getElementById('app');
+  const $toast = document.getElementById('toast');
+
+  const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
+  const save = (store, k, v) => { try { window[store].setItem(k, v); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const makeCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
+  const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+
+  let myPid = load('sessionStorage', 'ti_pid');
+  if (!myPid) { myPid = Math.random().toString(36).slice(2, 12); save('sessionStorage', 'ti_pid', myPid); }
+  let myName = load('localStorage', 'ti_name') || '';
+  let roomCode = cleanCode(new URLSearchParams(location.search).get('room'));
+
+  let peer = null, hostConn = null, isHost = false;
+  let G = null;        // full game state (host only)
+  let view = null;     // what this player is allowed to see
+  let busy = '', homeErr = '', lost = false, joinTimer = null;
+  let myPos = 50, selKey = '';
+
+  /* ---------------- HOST ---------------- */
+  const P = pid => G.players.find(p => p.pid === pid);
+
+  function createRoom() {
+    isHost = true;
+    const code = makeCode();
+    busy = 'Creating room…'; render();
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      busy = ''; roomCode = code;
+      G = {
+        code, phase: 'lobby', laps: 2, total: 0, round: 0, hostPid: myPid,
+        players: [{ pid: myPid, name: myName, score: 0, guess: null, pts: 0, conn: null, connected: true }],
+        giverPid: null, scale: null, target: null, gain: 0, deck: []
+      };
+      setRoomUrl(code);
+      sync();
+    });
+    peer.on('connection', conn => {
+      conn.on('data', msg => {
+        if (!G || !msg || typeof msg !== 'object') return;
+        if (msg.t === 'join') hostJoin(conn, msg);
+        else if (conn.pid) handle(conn.pid, msg);
+      });
+      conn.on('close', () => hostLeave(conn));
+      conn.on('error', () => hostLeave(conn));
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
+      else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function hostJoin(conn, msg) {
+    const pid = String(msg.pid || '').slice(0, 20);
+    const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
+    if (!pid) return;
+    let p = P(pid);
+    if (p) {                                   // same player coming back
+      if (p.pid === G.hostPid) return;
+      const old = p.conn;
+      p.conn = conn; p.connected = true; p.name = name;
+      if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    } else {
+      if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
+      G.players.push({ pid, name, score: 0, guess: null, pts: 0, conn, connected: true });
+    }
+    conn.pid = pid;
+    sync();
+  }
+
+  function hostLeave(conn) {
+    if (!G || !conn.pid) return;
+    const p = P(conn.pid);
+    if (!p || p.conn !== conn) return;
+    p.conn = null; p.connected = false;
+    if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
+    if (p.pid === G.giverPid && G.phase === 'clue') {
+      toastAll(p.name + ' (the clue giver) dropped out. Moving on.');
+      nextRound(); return;
+    }
+    if (G.phase === 'clue') maybeReveal();
+    sync();
+  }
+
+  function deal() {
+    if (!G.deck.length) G.deck = shuffle(SCALES);
+    G.scale = G.deck.pop();
+    G.target = 5 + Math.floor(Math.random() * 91);          // 5 to 95
+  }
+
+  function startGame() {
+    G.players = G.players.filter(p => p.connected);
+    G.players.forEach(p => { p.score = 0; });
+    G.deck = shuffle(SCALES);
+    G.round = 0; G.giverPid = null;
+    G.total = G.laps * G.players.length;
+    startRound();
+  }
+
+  function nextRound() {
+    if (G.round >= G.total) { G.phase = 'gameover'; sync(); }
+    else startRound();
+  }
+
+  function startRound() {
+    const live = G.players.filter(p => p.connected);
+    if (live.length < 2) {
+      G.players = live; G.phase = 'lobby';
+      toastAll('Not enough players left. Back to the lobby.');
+      sync(); return;
+    }
+    const n = G.players.length;
+    const cur = G.players.findIndex(p => p.pid === G.giverPid);
+    for (let i = 1; i <= n; i++) {
+      const cand = G.players[(cur + i + n) % n];
+      if (cand.connected) { G.giverPid = cand.pid; break; }
+    }
+    G.players.forEach(p => { p.guess = null; p.pts = 0; });
+    deal();
+    G.gain = 0;
+    G.round++;
+    G.phase = 'clue';
+    sync();
+  }
+
+  function maybeReveal() {
+    const need = G.players.filter(p => p.connected && p.pid !== G.giverPid);
+    if (need.length && need.every(p => p.guess !== null)) reveal();
+  }
+
+  // Guessers score by distance; the clue giver gets the average, so clear clues pay.
+  function reveal() {
+    const gs = G.players.filter(p => p.guess !== null);
+    gs.forEach(p => { p.pts = points(Math.abs(p.guess - G.target)); p.score += p.pts; });
+    G.gain = gs.length ? Math.round(gs.reduce((s, p) => s + p.pts, 0) / gs.length) : 0;
+    const g = P(G.giverPid); if (g) g.score += G.gain;
+    G.phase = 'reveal';
+  }
+
+  // Every player action lands here (the host's own actions too).
+  function handle(pid, msg) {
+    const p = P(pid);
+    if (!p) return;
+    const amHost = pid === G.hostPid, amGiver = pid === G.giverPid;
+    switch (msg.t) {
+      case 'laps':
+        if (amHost && G.phase === 'lobby') { G.laps = Math.min(5, Math.max(1, parseInt(msg.laps, 10) || 2)); sync(); }
+        break;
+      case 'start':
+        if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
+            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+        break;
+      case 'swap':                              // the clue giver can ask for a new scale before anyone guesses
+        if (G.phase === 'clue' && amGiver && !G.players.some(x => x.guess !== null)) { deal(); sync(); }
+        break;
+      case 'guess': {
+        const n = Math.round(Number(msg.pos));
+        if (G.phase !== 'clue' || amGiver || p.guess !== null || !(n >= 0 && n <= 100)) return;
+        p.guess = n;
+        maybeReveal();
+        sync();
+        break;
+      }
+      case 'reveal':                            // don't wait for stragglers
+        if (G.phase === 'clue' && (amGiver || amHost) && G.players.some(x => x.guess !== null)) { reveal(); sync(); }
+        break;
+      case 'next':
+        if (G.phase === 'reveal' && (amHost || amGiver)) nextRound();
+        break;
+      case 'lobby':
+        if (amHost && G.phase === 'gameover') {
+          G.players = G.players.filter(x => x.connected);
+          G.players.forEach(x => { x.score = 0; });
+          G.phase = 'lobby'; sync();
+        }
+        break;
+    }
+  }
+
+  function viewFor(pid) {
+    const me = P(pid), open = G.phase === 'reveal';
+    return {
+      code: G.code, phase: G.phase, laps: G.laps, total: G.total, round: G.round,
+      you: pid, hostPid: G.hostPid, giverPid: G.giverPid, scale: G.scale,
+      target: (open || pid === G.giverPid) ? G.target : null,
+      gain: G.gain, myGuess: me ? me.guess : null,
+      players: G.players.map(p => ({
+        pid: p.pid, name: p.name, score: p.score, connected: p.connected,
+        done: p.guess !== null, guess: open ? p.guess : null, pts: open ? p.pts : 0
+      }))
+    };
+  }
+
+  function sync() {
+    G.players.forEach(p => {
+      if (p.conn && p.conn.open) { try { p.conn.send({ t: 'state', v: viewFor(p.pid) }); } catch (e) {} }
+    });
+    view = viewFor(myPid);
+    render();
+  }
+
+  function toastAll(text) {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', text }); } catch (e) {} } });
+    toast(text);
+  }
+
+  /* ---------------- GUEST ---------------- */
+  function joinRoom(code) {
+    isHost = false; roomCode = code;
+    busy = 'Joining ' + code + '…'; render();
+    peer = new Peer();
+    joinTimer = setTimeout(() => joinFail('Could not find that room. Check the code and make sure the host still has the game open.'), 15000);
+    peer.on('open', () => connectHost());
+    peer.on('error', err => {
+      if (err.type === 'peer-unavailable') {
+        if (view) { lost = true; render(); }
+        else joinFail('No room with that code. Check it and try again.');
+      } else if (!view) joinFail('Connection problem. Check your internet and try again.');
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function connectHost() {
+    const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+    hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('data', msg => {
+      if (!msg || conn !== hostConn) return;
+      if (msg.t === 'state') {
+        clearTimeout(joinTimer); busy = ''; lost = false;
+        if (!view) setRoomUrl(roomCode);
+        view = msg.v; render();
+      } else if (msg.t === 'toast') toast(msg.text);
+      else if (msg.t === 'full') joinFail('That room is full.');
+    });
+    conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(); } });
+  }
+
+  function joinFail(text) {
+    clearTimeout(joinTimer);
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
+    render();
+  }
+
+  function act(msg) {
+    if (isHost) handle(myPid, msg);
+    else if (hostConn && hostConn.open) hostConn.send(msg);
+  }
+
+  /* ---------------- RENDERING ---------------- */
+  function setRoomUrl(code) {
+    try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  }
+  const shareUrl = () => location.origin + location.pathname + '?room=' + view.code;
+
+  let toastTimer = null;
+  function toast(text) {
+    $toast.textContent = text; $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
+  }
+
+  function render() {
+    if (!view) { $app.innerHTML = homeHTML(); return; }
+    const key = view.round + ':' + view.phase + ':' + (view.scale ? view.scale.join('|') : '');
+    const same = key === selKey;
+    if (!same) { selKey = key; myPos = 50; }
+    // Someone else locking in must not yank the slider out of a player's fingers:
+    // while I am still choosing, only the score strip is refreshed.
+    if (same && !lost && view.phase === 'clue' && view.myGuess === null && document.getElementById('dial')) {
+      const s = $app.querySelector('.scores');
+      if (s) s.outerHTML = scoresHTML();
+      return;
+    }
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    if (lost) {
+      html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2>' +
+        '<p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button>' +
+        '<button class="btn" data-act="leave">Leave</button></div></div></div>';
+    }
+    $app.innerHTML = html;
+  }
+
+  function homeHTML() {
+    const dis = busy ? ' disabled' : '';
+    return '<main class="home">' +
+      '<h1 class="logo">Tuned<br>In<i>.</i></h1>' +
+      '<p class="tag">One clue. One scale. How well do your friends read you?</p>' +
+      '<label class="field"><span>Your name</span>' +
+      '<input id="name" maxlength="16" autocomplete="off" placeholder="e.g. Sam" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>Create a room</button>' +
+      '<div class="or"><span>or join with a code</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
+      (busy ? '<p class="note">' + esc(busy) + '</p>' : '') +
+      (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
+      '<ol class="how"><li>Get everyone on a call. Each round one friend sees a scale, like "Forgivable" to "Unforgivable", with a secret target somewhere on it.</li>' +
+      '<li>They say one clue out loud that belongs at that spot. The best clues are personal: something they\'ve done, love or can\'t stand.</li>' +
+      '<li>Everyone else argues it out, then slides to where they think the target is. Closer is better.</li>' +
+      '<li>The target is revealed and the clue giver explains themselves.</li></ol>' +
+      '<p class="fine">' + MIN_PLAYERS + ' to ' + MAX_PLAYERS + ' players, each on their own phone or laptop.</p>' +
+      '</main>';
+  }
+
+  function lobbyHTML() {
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const laps = [1, 2, 3].map(g => '<option value="' + g + '"' + (g === v.laps ? ' selected' : '') + '>' + g + ' each</option>').join('');
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Room code</p>' +
+      '<div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">Copy invite link</button>' +
+      '<h2>Players <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p =>
+        '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
+      (amHost
+        ? '<label class="field inline"><span>Clues each</span><select id="laps">' + laps + '</select></label>' +
+          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
+          (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
+          '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
+        : '<p class="note">Waiting for the host to start. Everyone gives ' + v.laps + ' clue' + (v.laps > 1 ? 's' : '') + '.</p>') +
+      '</main>';
+  }
+
+  function scoresHTML() {
+    const v = view;
+    return '<ul class="scores">' + v.players.map(p => {
+      const giver = p.pid === v.giverPid;
+      const mark = giver ? 'clue giver' : (v.phase === 'clue' && p.done ? '✓' : '');
+      return '<li class="' + (giver ? 'giver ' : '') + (p.connected ? '' : 'off ') + (p.pid === v.you ? 'me' : '') + '">' +
+        '<span class="nm">' + esc(p.name) + '</span>' +
+        (mark ? '<span class="mk">' + mark + '</span>' : '') +
+        '<b>' + p.score + '</b></li>';
+    }).join('') + '</ul>';
+  }
+
+  // The scale: two ends, an optional target with its scoring zones, and any pins.
+  function scaleHTML(target, pins) {
+    const v = view;
+    let bands = '';
+    if (target !== null) {
+      ZONES.slice().reverse().forEach(([w, p]) => {
+        bands += '<div class="band z' + p + '" style="left:' + (target - w) + '%;width:' + (2 * w) + '%"></div>';
+      });
+    }
+    return '<div class="scale"><div class="ends"><span>' + esc(v.scale[0]) + '</span><span>' + esc(v.scale[1]) + '</span></div>' +
+      '<div class="track">' + bands + '</div>' +
+      '<div class="pins">' + pins.map((p, i) =>
+        '<div class="pin' + (p.me ? ' me' : '') + (i % 2 ? ' up' : '') + '"' + (p.id ? ' id="' + p.id + '"' : '') + ' style="left:' + p.pos + '%">' +
+        (p.label ? '<span>' + esc(p.label) + '</span>' : '') + '</div>').join('') + '</div>' +
+      (pins.some(p => p.label) ? '<div class="pad"></div>' : '') + '</div>';
+  }
+  const legend = '<p class="legend"><span><i style="background:#fff"></i>4 points</span>' +
+    '<span><i style="background:rgba(255,255,255,.45)"></i>3 points</span>' +
+    '<span><i style="background:rgba(255,255,255,.2)"></i>2 points</span></p>';
+
+  function gameHTML() {
+    const v = view;
+    const amGiver = v.you === v.giverPid, amHost = v.you === v.hostPid;
+    const name = pid => { const p = v.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+    const giver = esc(name(v.giverPid));
+    const guessers = v.players.filter(p => p.pid !== v.giverPid && (p.connected || p.done));
+    const locked = guessers.filter(p => p.done).length;
+    let body = '', action = '';
+
+    if (v.phase === 'clue') {
+      if (amGiver) {
+        body = '<p class="status">Only you can see the target. Say one clue out loud that belongs right there.</p>' +
+          '<p class="tip">Make it personal: something you\'ve done, own, love or can\'t stand. Don\'t use the words on the scale, and don\'t hint at left or right.</p>' +
+          scaleHTML(v.target, []) + legend;
+        action = (locked === 0 ? '<button class="btn" data-act="swap">Different scale</button>' : '') +
+          '<button class="btn primary big" data-act="reveal"' + (locked ? '' : ' disabled') + '>Reveal (' + locked + ' of ' + guessers.length + ' locked in)</button>';
+      } else if (v.myGuess !== null) {
+        body = '<p class="status">Locked in. Waiting on ' + (guessers.length - locked) + ' more.</p>' +
+          scaleHTML(null, [{ pos: v.myGuess, me: true, label: 'You' }]);
+        if (amHost) action = '<button class="btn" data-act="reveal">Reveal now</button>';
+      } else {
+        body = '<p class="status">Listen to ' + giver + '\'s clue. Where on the scale does it sit for them?</p>' +
+          '<p class="tip">Talk it over, then slide and lock in. Guesses stay hidden until the reveal.</p>' +
+          scaleHTML(null, [{ pos: myPos, me: true, id: 'me' }]) +
+          '<input type="range" id="dial" min="0" max="100" step="1" value="' + myPos + '" aria-label="Your guess">';
+        action = '<button class="btn primary big" data-act="guess">Lock in</button>';
+      }
+    } else {
+      const gs = v.players.filter(p => p.guess !== null).sort((a, b) => b.pts - a.pts || Math.abs(a.guess - v.target) - Math.abs(b.guess - v.target));
+      const best = gs.length ? gs[0].pts : 0;
+      body = '<p class="status">' + (best === 4 ? 'Bullseye. ' : best ? '' : 'Nobody was close. ') + giver + ' scores ' + v.gain + ' for the clue.</p>' +
+        scaleHTML(v.target, gs.map(p => ({ pos: p.guess, me: p.pid === v.you, label: p.name }))) + legend +
+        '<ul class="rows">' + gs.map(p => '<li class="' + (p.pts === 4 ? 'top' : '') + '"><span>' + esc(p.name) + '</span><span>' +
+          Math.abs(p.guess - v.target) + ' away · <b>+' + p.pts + '</b></span></li>').join('') + '</ul>' +
+        '<div class="story"><p class="lbl">Explain yourself</p><p>' + giver + ', tell everyone the story behind that clue, and why it sits there for you.</p></div>';
+      if (amGiver || amHost) action = '<button class="btn primary big" data-act="next">' + (v.round >= v.total ? 'See final scores' : 'Next round') + '</button>';
+    }
+
+    return '<header class="bar"><span>Room <b>' + esc(v.code) + '</b></span><span>Round ' + v.round + ' of ' + v.total + '</span></header>' +
+      scoresHTML() +
+      '<main class="stage">' + body + '<div class="action">' + action + '</div></main>';
+  }
+
+  function overHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Game over</p>' +
+      '<div class="code small">' + esc(ranked[0].name) + ' wins</div>' +
+      '<ul class="plist rank">' + ranked.map((p, i) =>
+        '<li><span>' + (i + 1) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      (amHost
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
+          '<button class="btn" data-act="lobby">Back to lobby</button>'
+        : '<p class="note">Waiting for the host to start another game.</p>') +
+      '</main>';
+  }
+
+  /* ---------------- EVENTS ---------------- */
+  function readName() {
+    myName = myName.trim().slice(0, 16);
+    if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
+    save('localStorage', 'ti_name', myName);
+    homeErr = '';
+    return true;
+  }
+
+  $app.addEventListener('input', e => {
+    if (e.target.id === 'name') myName = e.target.value;
+    if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+    if (e.target.id === 'dial') {
+      myPos = parseInt(e.target.value, 10);
+      const pin = document.getElementById('me');
+      if (pin) pin.style.left = myPos + '%';
+    }
+  });
+  $app.addEventListener('change', e => {
+    if (e.target.id === 'laps') act({ t: 'laps', laps: e.target.value });
+  });
+  $app.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'code') go('join');
+  });
+  $app.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el && !el.disabled) go(el.dataset.act, el);
+  });
+
+  function go(a) {
+    switch (a) {
+      case 'create':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (readName()) createRoom();
+        break;
+      case 'join':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (!readName()) return;
+        if (roomCode.length !== 5) { homeErr = 'Room codes are 5 letters.'; render(); return; }
+        joinRoom(roomCode);
+        break;
+      case 'copy': {
+        const url = shareUrl();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'), () => prompt('Copy this link:', url));
+        else prompt('Copy this link:', url);
+        break;
+      }
+      case 'start': act({ t: 'start' }); break;
+      case 'lobby': act({ t: 'lobby' }); break;
+      case 'swap': act({ t: 'swap' }); break;
+      case 'guess': act({ t: 'guess', pos: myPos }); break;
+      case 'reveal': act({ t: 'reveal' }); break;
+      case 'next': act({ t: 'next' }); break;
+      case 'reconnect':
+        toast('Reconnecting…');
+        if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+        if (peer && !peer.destroyed) connectHost();
+        break;
+      case 'leave': location.href = location.pathname; break;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
