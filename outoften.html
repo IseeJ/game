@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Out of Ten — how well do your friends know you?</title>
+<meta name="description" content="One friend has a secret number they can't see. Everyone else describes it without saying it. Play over a call with a room code.">
+<style>
+:root {
+  --bg: #f4f1ff;
+  --panel: #ffffff;
+  --line: #dcd5f5;
+  --ink: #1c1633;
+  --dim: #6d6788;
+  --accent: #5b3df5;
+  --accent-dark: #4327d1;
+  --good: #128a5e;
+  --radius: 16px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.btn {
+  appearance: none; border: 2px solid var(--line); background: var(--panel);
+  font-weight: 700; padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  transition: transform .08s, background .15s, border-color .15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn.big { padding: 14px 24px; font-size: 1.05rem; }
+.btn.small { padding: 6px 14px; font-size: .9rem; }
+.field { display: block; text-align: left; margin: 0 0 14px; }
+.field span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 6px; }
+.field.inline { display: flex; align-items: center; gap: 12px; }
+.field.inline span { margin: 0; }
+input, select { width: 100%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
+select { width: auto; }
+input::placeholder { color: #b9b2d6; font-weight: 400; }
+
+.seg { display: flex; gap: 8px; }
+.seg .btn { flex: 1; border-radius: 12px; padding: 10px 8px; }
+.seg .btn.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
+.hint { margin: 6px 0 0; color: var(--dim); font-size: .85rem; }
+.home, .lobby { max-width: 420px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+.logo { font-size: clamp(3.2rem, 17vw, 5rem); line-height: .9; letter-spacing: -.04em; margin: 0; font-weight: 900; }
+.logo i { font-style: normal; color: var(--accent); }
+.tag { color: var(--dim); margin: 4px 0 20px; font-size: 1.05rem; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: .85rem; margin: 8px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.joinrow { display: flex; gap: 10px; }
+.joinrow input { text-transform: uppercase; letter-spacing: .3em; font-size: 1.2rem; text-align: center; }
+.note { color: var(--dim); margin: 8px 0 0; }
+.err { color: #c0264a; font-weight: 700; margin: 8px 0 0; }
+.fine { color: var(--dim); font-size: .85rem; margin: 16px 0 0; }
+.how { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font-size: .92rem; }
+.how li { margin-bottom: 4px; }
+.lobby { text-align: center; align-items: center; }
+.lobby > * { width: 100%; }
+.lobby > .btn.small { width: auto; }
+.eyebrow { margin: 0; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+.code { font-size: clamp(3rem, 16vw, 4.5rem); font-weight: 900; letter-spacing: .12em; color: var(--accent); line-height: 1; margin-bottom: 4px; }
+.code.small { font-size: 2.2rem; letter-spacing: 0; }
+.lobby h2 { margin: 24px 0 0; font-size: 1.1rem; text-align: left; }
+.dim { color: var(--dim); font-weight: 400; }
+.plist { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
+.plist li { padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; font-weight: 700; }
+.plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
+.plist.rank li { display: flex; justify-content: space-between; }
+.plist.rank li:first-child { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
+.bar b { color: var(--accent); letter-spacing: .1em; }
+.scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
+.scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 6px 8px 6px 14px; font-size: .9rem; }
+.scores li.me .nm { text-decoration: underline; text-underline-offset: 3px; }
+.scores li.seat { border-color: var(--accent); }
+.scores li.off { opacity: .4; }
+.scores .mk { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.scores b { background: var(--bg); border-radius: 999px; min-width: 26px; text-align: center; padding: 2px 6px; }
+
+.stage { max-width: 560px; margin: 0 auto; padding: 12px 20px 120px; text-align: center; }
+.topic { background: var(--ink); color: #fff; border-radius: var(--radius); padding: 18px 20px; }
+.topic p { margin: 0; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; opacity: .7; }
+.topic h2 { margin: 6px 0 0; font-size: 1.7rem; line-height: 1.15; }
+.topic + .status { margin-top: 20px; }
+.status { margin: 12px 0 0; font-size: 1.15rem; font-weight: 700; }
+.disc {
+  width: 190px; height: 190px; border-radius: 50%; margin: 22px auto 0;
+  background: var(--accent); color: #fff; display: grid; place-items: center;
+  font-size: 6rem; font-weight: 900; line-height: 1; box-shadow: 0 10px 0 var(--accent-dark);
+}
+.disc.hidden { background: var(--panel); color: var(--line); border: 4px dashed var(--line); box-shadow: none; }
+.disc small { display: block; font-size: 1rem; font-weight: 700; opacity: .8; margin-top: -6px; }
+.brief { margin: 26px 0 0; font-size: 1.05rem; }
+.brief b { color: var(--accent); }
+.tip { margin: 10px 0 0; color: var(--dim); font-size: .92rem; }
+.nums { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 22px 0 0; }
+.num {
+  appearance: none; border: 2px solid var(--line); background: var(--panel); border-radius: 12px;
+  padding: 14px 0; font-size: 1.3rem; font-weight: 900; cursor: pointer; transition: transform .08s;
+}
+.num:hover { border-color: var(--ink); }
+.num.sel { background: var(--accent); border-color: var(--accent); color: #fff; transform: translateY(-3px); }
+.verdict { margin: 18px 0 0; font-size: 1.25rem; font-weight: 900; }
+.verdict.hit { color: var(--good); }
+.story { margin: 22px 0 0; background: var(--panel); border: 2px solid var(--accent); border-radius: var(--radius); padding: 16px; text-align: left; }
+.story p { margin: 0; }
+.story .lbl { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: 6px; }
+.mvp { margin: 22px 0 0; }
+.mvp p { margin: 0 0 10px; font-weight: 700; }
+.mvp .row { justify-content: center; }
+.action { margin-top: 22px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 799px) {
+  .action:not(:empty) { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); z-index: 5; }
+  .action .btn { width: 100%; }
+}
+
+.overlay { position: fixed; inset: 0; background: rgba(28, 22, 51, .7); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--panel); border-radius: var(--radius); padding: 24px; max-width: 380px; }
+.dialog h2 { margin: 0 0 8px; }
+.dialog p { color: var(--dim); margin: 0 0 18px; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: #fff; font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- PeerJS: browser-to-browser connections, no server of your own needed -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+/* =====================================================
+   THE TOPICS. Only used when the host turns topics on in
+   the lobby. Edit freely: one per line, in quotes, with a
+   comma after each. Write them without "a" or "an" at the
+   start; the game adds it.
+   ===================================================== */
+const TOPICS = [
+  "first date",
+  "partner",
+  "dating profile",
+  "text from an ex",
+  "way to get dumped",
+  "anniversary present",
+  "thing to find out about a partner three months in",
+  "wedding to be invited to",
+  "in-law",
+  "honeymoon",
+  "pick-up line",
+  "apology from a partner",
+  "partner's hobby",
+  "reason to break up with someone",
+  "couple to go on a double date with",
+  "one-night stand",
+  "thing to hear in bed",
+  "walk of shame",
+  "place to hook up",
+  "dirty talk",
+  "accent",
+  "Friday night",
+  "group holiday",
+  "housemate",
+  "friend's new partner",
+  "karaoke song",
+  "house party",
+  "hen or stag do",
+  "road trip",
+  "festival weekend",
+  "surprise",
+  "group chat message to wake up to",
+  "person to be stuck in a lift with",
+  "job",
+  "boss",
+  "way to spend a thousand pounds",
+  "Monday morning",
+  "reason to quit a job",
+  "colleague to sit next to",
+  "Sunday",
+  "meal",
+  "holiday",
+  "place to live in",
+  "neighbour",
+  "pet",
+  "hangover",
+  "tattoo idea",
+  "haircut",
+  "birthday present",
+  "film night pick",
+  "morning routine",
+  "compliment",
+  "thing to be famous for",
+  "way to spend a day off",
+  "takeaway order",
+  "life decision",
+  "New Year's Eve",
+  "thing to find in your friend's search history",
+  "way to spend your fortieth birthday",
+  "secret to be told"
+];
+
+/* =====================================================
+   THE GAME. The player who creates the room is the host:
+   their browser holds the real game state and sends each
+   player only what they are allowed to see. The player in
+   the hot seat is never sent their own number.
+   ===================================================== */
+(() => {
+  'use strict';
+
+  const PREFIX = 'outoften-v1-';
+  const MIN_PLAYERS = 3, MAX_PLAYERS = 12;
+  const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+  const $app = document.getElementById('app');
+  const $toast = document.getElementById('toast');
+
+  const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
+  const save = (store, k, v) => { try { window[store].setItem(k, v); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const makeCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
+  const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+  const withA = s => (/^[aeiou]/i.test(s) ? 'an ' : 'a ') + s;
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+  let myPid = load('sessionStorage', 'oot_pid');
+  if (!myPid) { myPid = Math.random().toString(36).slice(2, 12); save('sessionStorage', 'oot_pid', myPid); }
+  let myName = load('localStorage', 'oot_name') || '';
+  let roomCode = cleanCode(new URLSearchParams(location.search).get('room'));
+
+  let peer = null, hostConn = null, isHost = false;
+  let G = null;        // full game state (host only)
+  let view = null;     // what this player is allowed to see
+  let busy = '', homeErr = '', lost = false, joinTimer = null;
+  let myGuess = null, selKey = '';
+  let useTopics = load('localStorage', 'oot_topics') !== '0';   // the setting on the home screen
+
+  /* ---------------- HOST ---------------- */
+  const P = pid => G.players.find(p => p.pid === pid);
+
+  function createRoom() {
+    isHost = true;
+    const code = makeCode();
+    busy = 'Creating room…'; render();
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      busy = ''; roomCode = code;
+      G = {
+        code, phase: 'lobby', laps: 2, useTopics, total: 0, round: 0, hostPid: myPid,
+        players: [{ pid: myPid, name: myName, score: 0, conn: null, connected: true }],
+        seatPid: null, topic: null, topicDeck: [], number: null, guess: null, gain: 0, mvpPid: null
+      };
+      setRoomUrl(code);
+      sync();
+    });
+    peer.on('connection', conn => {
+      conn.on('data', msg => {
+        if (!G || !msg || typeof msg !== 'object') return;
+        if (msg.t === 'join') hostJoin(conn, msg);
+        else if (conn.pid) handle(conn.pid, msg);
+      });
+      conn.on('close', () => hostLeave(conn));
+      conn.on('error', () => hostLeave(conn));
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
+      else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function hostJoin(conn, msg) {
+    const pid = String(msg.pid || '').slice(0, 20);
+    const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
+    if (!pid) return;
+    let p = P(pid);
+    if (p) {                                   // same player coming back
+      if (p.pid === G.hostPid) return;
+      const old = p.conn;
+      p.conn = conn; p.connected = true; p.name = name;
+      if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    } else {
+      if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
+      G.players.push({ pid, name, score: 0, conn, connected: true });
+    }
+    conn.pid = pid;
+    sync();
+  }
+
+  function hostLeave(conn) {
+    if (!G || !conn.pid) return;
+    const p = P(conn.pid);
+    if (!p || p.conn !== conn) return;
+    p.conn = null; p.connected = false;
+    if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
+    if (p.pid === G.seatPid && (G.phase === 'clue' || G.phase === 'reveal')) {
+      toastAll(p.name + ' left the hot seat. Moving on.');
+      nextRound(); return;
+    }
+    sync();
+  }
+
+  function deal() {
+    if (!G.useTopics) G.topic = null;          // numbers only: the friends can describe anything
+    else {
+      if (!G.topicDeck.length) G.topicDeck = shuffle(TOPICS);
+      G.topic = G.topicDeck.pop();
+    }
+    G.number = 1 + Math.floor(Math.random() * 10);
+  }
+
+  function startGame() {
+    G.players = G.players.filter(p => p.connected);
+    G.players.forEach(p => { p.score = 0; });
+    G.round = 0; G.seatPid = null; G.topicDeck = [];
+    G.total = G.laps * G.players.length;
+    startRound();
+  }
+
+  function nextRound() {
+    if (G.round >= G.total) { G.phase = 'gameover'; sync(); }
+    else startRound();
+  }
+
+  function startRound() {
+    const live = G.players.filter(p => p.connected);
+    if (live.length < 2) {
+      G.players = live; G.phase = 'lobby';
+      toastAll('Not enough players left. Back to the lobby.');
+      sync(); return;
+    }
+    const n = G.players.length;
+    const cur = G.players.findIndex(p => p.pid === G.seatPid);
+    for (let i = 1; i <= n; i++) {
+      const cand = G.players[(cur + i + n) % n];
+      if (cand.connected) { G.seatPid = cand.pid; break; }
+    }
+    deal();
+    G.guess = null; G.gain = 0; G.mvpPid = null;
+    G.round++;
+    G.phase = 'clue';
+    sync();
+  }
+
+  // Every player action lands here (the host's own actions too).
+  function handle(pid, msg) {
+    const p = P(pid);
+    if (!p) return;
+    const amHost = pid === G.hostPid, inSeat = pid === G.seatPid;
+    switch (msg.t) {
+      case 'laps':
+        if (amHost && G.phase === 'lobby') { G.laps = Math.min(5, Math.max(1, parseInt(msg.laps, 10) || 2)); sync(); }
+        break;
+      case 'topics':
+        if (amHost && G.phase === 'lobby') { G.useTopics = !!msg.on; sync(); }
+        break;
+      case 'start':
+        if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
+            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+        break;
+      case 'swap':                              // the friends can ask for a different number (and topic)
+        if (G.phase === 'clue' && !inSeat) { deal(); sync(); }
+        break;
+      case 'guess': {
+        const n = parseInt(msg.n, 10);
+        if (G.phase !== 'clue' || !inSeat || !(n >= 1 && n <= 10)) return;
+        const off = Math.abs(n - G.number);
+        G.guess = n;
+        G.gain = off === 0 ? 3 : off === 1 ? 1 : 0;
+        p.score += G.gain;
+        G.phase = 'reveal';
+        sync();
+        break;
+      }
+      case 'mvp': {
+        const w = P(msg.pid);
+        if (G.phase !== 'reveal' || !inSeat || G.mvpPid || !w || w.pid === pid) return;
+        w.score++; G.mvpPid = w.pid;
+        sync();
+        break;
+      }
+      case 'next':
+        if (G.phase === 'reveal' && (amHost || (inSeat && G.mvpPid))) nextRound();
+        break;
+      case 'lobby':
+        if (amHost && G.phase === 'gameover') {
+          G.players = G.players.filter(x => x.connected);
+          G.players.forEach(x => { x.score = 0; });
+          G.phase = 'lobby'; sync();
+        }
+        break;
+    }
+  }
+
+  function viewFor(pid) {
+    const hide = G.phase === 'clue' && pid === G.seatPid;      // the hot seat never gets their own number early
+    return {
+      code: G.code, phase: G.phase, laps: G.laps, useTopics: G.useTopics, total: G.total, round: G.round,
+      you: pid, hostPid: G.hostPid, seatPid: G.seatPid,
+      topic: G.topic, number: hide ? null : G.number,
+      guess: G.guess, gain: G.gain, mvpPid: G.mvpPid,
+      players: G.players.map(p => ({ pid: p.pid, name: p.name, score: p.score, connected: p.connected }))
+    };
+  }
+
+  function sync() {
+    G.players.forEach(p => {
+      if (p.conn && p.conn.open) { try { p.conn.send({ t: 'state', v: viewFor(p.pid) }); } catch (e) {} }
+    });
+    view = viewFor(myPid);
+    render();
+  }
+
+  function toastAll(text) {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', text }); } catch (e) {} } });
+    toast(text);
+  }
+
+  /* ---------------- GUEST ---------------- */
+  function joinRoom(code) {
+    isHost = false; roomCode = code;
+    busy = 'Joining ' + code + '…'; render();
+    peer = new Peer();
+    joinTimer = setTimeout(() => joinFail('Could not find that room. Check the code and make sure the host still has the game open.'), 15000);
+    peer.on('open', () => connectHost());
+    peer.on('error', err => {
+      if (err.type === 'peer-unavailable') {
+        if (view) { lost = true; render(); }
+        else joinFail('No room with that code. Check it and try again.');
+      } else if (!view) joinFail('Connection problem. Check your internet and try again.');
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function connectHost() {
+    const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+    hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('data', msg => {
+      if (!msg || conn !== hostConn) return;
+      if (msg.t === 'state') {
+        clearTimeout(joinTimer); busy = ''; lost = false;
+        if (!view) setRoomUrl(roomCode);
+        view = msg.v; render();
+      } else if (msg.t === 'toast') toast(msg.text);
+      else if (msg.t === 'full') joinFail('That room is full.');
+    });
+    conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(); } });
+  }
+
+  function joinFail(text) {
+    clearTimeout(joinTimer);
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
+    render();
+  }
+
+  function act(msg) {
+    if (isHost) handle(myPid, msg);
+    else if (hostConn && hostConn.open) hostConn.send(msg);
+  }
+
+  /* ---------------- RENDERING ---------------- */
+  function setRoomUrl(code) {
+    try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  }
+  const shareUrl = () => location.origin + location.pathname + '?room=' + view.code;
+
+  let toastTimer = null;
+  function toast(text) {
+    $toast.textContent = text; $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
+  }
+
+  function render() {
+    if (!view) { $app.innerHTML = homeHTML(); return; }
+    const key = view.round + ':' + view.phase + ':' + view.topic;
+    if (key !== selKey) { selKey = key; myGuess = null; }
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    if (lost) {
+      html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2>' +
+        '<p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button>' +
+        '<button class="btn" data-act="leave">Leave</button></div></div></div>';
+    }
+    $app.innerHTML = html;
+  }
+
+  function homeHTML() {
+    const dis = busy ? ' disabled' : '';
+    return '<main class="home">' +
+      '<h1 class="logo">Out of<br>Ten<i>.</i></h1>' +
+      '<p class="tag">Your friends can see your number. You can\'t.</p>' +
+      '<label class="field"><span>Your name</span>' +
+      '<input id="name" maxlength="16" autocomplete="off" placeholder="name" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<div class="field"><span>Topic cards</span><div class="seg">' +
+      '<button class="btn' + (useTopics ? ' sel' : '') + '" data-act="mode" data-on="1"' + dis + '>With topics</button>' +
+      '<button class="btn' + (useTopics ? '' : ' sel') + '" data-act="mode" data-on="0"' + dis + '>Numbers only</button></div>' +
+      '<p class="hint">' + (useTopics ? 'Each round comes with a topic, like "first date".' : 'No topics. Your friends make up whatever they like.') + ' Used when you create a room.</p></div>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>Create a room</button>' +
+      '<div class="or"><span>or join with a code</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
+      (busy ? '<p class="note">' + esc(busy) + '</p>' : '') +
+      (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
+      '<ol class="how"><li>Get everyone on a call. One friend takes the hot seat and gets a secret number from 1 to 10 that only the others can see.</li>' +
+      '<li>The others describe anything the hot seat would rate that number: "He\'s a ten, but he\'s cheating on you. What is he now?"</li>' +
+      '<li>The hot seat guesses their number, then owes everyone a true story.</li></ol>' +
+      '<p class="fine">' + MIN_PLAYERS + ' to ' + MAX_PLAYERS + ' players, each on their own phone or laptop.</p>' +
+      '</main>';
+  }
+
+  function lobbyHTML() {
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const laps = [1, 2, 3].map(g => '<option value="' + g + '"' + (g === v.laps ? ' selected' : '') + '>' + g + ' each</option>').join('');
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Room code</p>' +
+      '<div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">Copy invite link</button>' +
+      '<h2>Players <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p =>
+        '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
+      (amHost
+        ? '<label class="field inline"><span>Turns in the hot seat</span><select id="laps">' + laps + '</select></label>' +
+          '<label class="field inline"><span>Topics</span><select id="topics">' +
+          '<option value="0"' + (v.useTopics ? '' : ' selected') + '>Off, numbers only</option>' +
+          '<option value="1"' + (v.useTopics ? ' selected' : '') + '>On</option></select></label>' +
+          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
+          (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
+          '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
+        : '<p class="note">Waiting for the host to start. Everyone gets ' + v.laps + ' turn' + (v.laps > 1 ? 's' : '') + ' in the hot seat, ' + (v.useTopics ? 'with a topic each round.' : 'numbers only.') + '</p>') +
+      '</main>';
+  }
+
+  function scoresHTML() {
+    const v = view;
+    return '<ul class="scores">' + v.players.map(p => {
+      const seat = p.pid === v.seatPid;
+      return '<li class="' + (seat ? 'seat ' : '') + (p.connected ? '' : 'off ') + (p.pid === v.you ? 'me' : '') + '">' +
+        '<span class="nm">' + esc(p.name) + '</span>' +
+        (seat ? '<span class="mk">hot seat</span>' : '') +
+        '<b>' + p.score + '</b></li>';
+    }).join('') + '</ul>';
+  }
+
+  function gameHTML() {
+    const v = view;
+    const inSeat = v.you === v.seatPid, amHost = v.you === v.hostPid;
+    const name = pid => { const p = v.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+    const seat = esc(name(v.seatPid));
+    let body = '', action = '';
+
+    if (v.phase === 'clue') {
+      if (inSeat) {
+        body = '<p class="status">You\'re in the hot seat. Listen to your friends, then guess your number.</p>' +
+          '<div class="disc hidden">?</div>' +
+          '<div class="nums">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n =>
+            '<button class="num' + (myGuess === n ? ' sel' : '') + '" data-act="num" data-i="' + n + '">' + n + '</button>').join('') + '</div>';
+        action = '<button class="btn primary big" data-act="guess"' + (myGuess === null ? ' disabled' : '') + '>Lock in my guess</button>';
+      } else {
+        body = '<p class="status">' + seat + ' can\'t see this number.</p>' +
+          '<div class="disc"><span>' + v.number + '<small>out of 10</small></span></div>' +
+          '<p class="brief">Describe ' + (v.topic ? esc(withA(v.topic)) : 'someone or something') + ' that ' + seat + ' would rate <b>' + v.number + ' out of 10</b>.</p>' +
+          '<p class="tip">' + (v.topic ? '' : 'A date, a job, a night out, anything. ') + 'Make it personal: use what you know about them. Don\'t say the number.</p>';
+        action = '<button class="btn" data-act="swap">' + (v.topic ? 'Different topic and number' : 'Different number') + '</button>';
+      }
+    } else {
+      const hit = v.guess === v.number, close = Math.abs(v.guess - v.number) === 1;
+      const others = v.players.filter(p => p.pid !== v.seatPid && p.connected);
+      body = '<p class="status">' + seat + ' guessed ' + v.guess + '.</p>' +
+        '<div class="disc"><span>' + v.number + '<small>out of 10</small></span></div>' +
+        '<p class="verdict' + (hit ? ' hit' : '') + '">' +
+        (hit ? 'Spot on. +3 for ' + seat + '.' : close ? 'So close. +1 for ' + seat + '.' : 'Not this time.') + '</p>' +
+        '<div class="story"><p class="lbl">Story time</p><p>' + seat + ', tell everyone about ' + (v.topic ? 'a real ' + esc(v.topic) : 'something real') + ' from your life that you\'d give ' + (v.number === 8 ? 'an ' : 'a ') + v.number + '.</p></div>';
+      if (v.mvpPid) {
+        body += '<p class="verdict">Best clue: ' + esc(name(v.mvpPid)) + '. +1.</p>';
+      } else if (inSeat && others.length) {
+        body += '<div class="mvp"><p>Whose clue was the best?</p><div class="row">' +
+          others.map(p => '<button class="btn" data-act="mvp" data-pid="' + esc(p.pid) + '">' + esc(p.name) + '</button>').join('') + '</div></div>';
+      } else {
+        body += '<p class="note">' + seat + ' is picking the best clue.</p>';
+      }
+      const last = v.round >= v.total;
+      if (v.mvpPid ? (inSeat || amHost) : amHost) {
+        action = '<button class="btn' + (v.mvpPid ? ' primary' : '') + ' big" data-act="next">' + (last ? 'See final scores' : (v.mvpPid ? 'Next round' : 'Skip to next round')) + '</button>';
+      }
+    }
+
+    return '<header class="bar"><span>Room <b>' + esc(v.code) + '</b></span><span>Round ' + v.round + ' of ' + v.total + '</span></header>' +
+      scoresHTML() +
+      '<main class="stage">' +
+      (v.topic ? '<div class="topic"><p>Topic</p><h2>' + esc(cap(withA(v.topic))) + '</h2></div>' : '') +
+      body + '<div class="action">' + action + '</div>' +
+      '</main>';
+  }
+
+  function overHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Game over</p>' +
+      '<div class="code small">' + esc(ranked[0].name) + ' wins</div>' +
+      '<ul class="plist rank">' + ranked.map((p, i) =>
+        '<li><span>' + (i + 1) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      (amHost
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
+          '<button class="btn" data-act="lobby">Back to lobby</button>'
+        : '<p class="note">Waiting for the host to start another game.</p>') +
+      '</main>';
+  }
+
+  /* ---------------- EVENTS ---------------- */
+  function readName() {
+    myName = myName.trim().slice(0, 16);
+    if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
+    save('localStorage', 'oot_name', myName);
+    homeErr = '';
+    return true;
+  }
+
+  $app.addEventListener('input', e => {
+    if (e.target.id === 'name') myName = e.target.value;
+    if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+  });
+  $app.addEventListener('change', e => {
+    if (e.target.id === 'laps') act({ t: 'laps', laps: e.target.value });
+    if (e.target.id === 'topics') act({ t: 'topics', on: e.target.value === '1' });
+  });
+  $app.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'code') go('join');
+  });
+  $app.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el && !el.disabled) go(el.dataset.act, el);
+  });
+
+  function go(a, el) {
+    switch (a) {
+      case 'create':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (readName()) createRoom();
+        break;
+      case 'join':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (!readName()) return;
+        if (roomCode.length !== 5) { homeErr = 'Room codes are 5 letters.'; render(); return; }
+        joinRoom(roomCode);
+        break;
+      case 'copy': {
+        const url = shareUrl();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'), () => prompt('Copy this link:', url));
+        else prompt('Copy this link:', url);
+        break;
+      }
+      case 'mode':
+        useTopics = el.dataset.on === '1';
+        save('localStorage', 'oot_topics', useTopics ? '1' : '0');
+        render();
+        break;
+      case 'start': act({ t: 'start' }); break;
+      case 'lobby': act({ t: 'lobby' }); break;
+      case 'swap': act({ t: 'swap' }); break;
+      case 'num': myGuess = parseInt(el.dataset.i, 10); render(); break;
+      case 'guess': if (myGuess !== null) act({ t: 'guess', n: myGuess }); break;
+      case 'mvp': act({ t: 'mvp', pid: el.dataset.pid }); break;
+      case 'next': act({ t: 'next' }); break;
+      case 'reconnect':
+        toast('Reconnecting…');
+        if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+        if (peer && !peer.destroyed) connectHost();
+        break;
+      case 'leave': location.href = location.pathname; break;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
