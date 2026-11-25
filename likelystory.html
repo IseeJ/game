@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Likely Story — the alibi party game</title>
+<meta name="description" content="A crime has been committed. Build the least believable alibi. Create a room, share the code, play with friends.">
+<style>
+:root {
+  --bg: #e9dfc9;
+  --paper: #fbf6ea;
+  --line: #cdbf9f;
+  --ink: #1d1a16;
+  --dim: #6f6552;
+  --stamp: #b3261e;
+  --who: #1f5fa8;
+  --what: #1b7a52;
+  --where: #7a3a9a;
+  --radius: 10px;
+  --type: "Courier New", Courier, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--stamp); outline-offset: 2px; }
+
+/* buttons & fields */
+.btn {
+  appearance: none; border: 2px solid var(--ink); background: var(--paper);
+  font-weight: 700; padding: 10px 18px; border-radius: 6px; cursor: pointer;
+  transition: transform .08s, background .15s;
+}
+.btn:hover:not(:disabled) { background: #fff; }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn.primary:hover:not(:disabled) { background: #3a342b; }
+.btn.big { padding: 14px 24px; font-size: 1.05rem; }
+.btn.small { padding: 6px 14px; font-size: .9rem; }
+.field { display: block; text-align: left; margin: 0 0 14px; }
+.field span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 6px; }
+.field.inline { display: flex; align-items: center; gap: 12px; }
+.field.inline span { margin: 0; }
+input, select { width: 100%; background: var(--paper); border: 2px solid var(--line); border-radius: 6px; padding: 12px 14px; font-weight: 700; }
+select { width: auto; }
+input::placeholder { color: #b5a88a; font-weight: 400; }
+
+/* home & lobby */
+.home, .lobby { max-width: 420px; margin: 0 auto; padding: 48px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+.logo { font-family: var(--type); font-size: clamp(3rem, 16vw, 4.6rem); line-height: .92; letter-spacing: -.05em; margin: 0; font-weight: 700; }
+.logo i { font-style: normal; color: var(--stamp); }
+.tag { color: var(--dim); margin: 4px 0 20px; font-size: 1.05rem; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: .85rem; margin: 8px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.joinrow { display: flex; gap: 10px; }
+.joinrow input { text-transform: uppercase; letter-spacing: .3em; font-size: 1.2rem; text-align: center; }
+.note { color: var(--dim); margin: 8px 0 0; }
+.err { color: var(--stamp); font-weight: 700; margin: 8px 0 0; }
+.fine { color: var(--dim); font-size: .85rem; margin: 16px 0 0; }
+.how { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font-size: .92rem; }
+.how li { margin-bottom: 4px; }
+.lobby { text-align: center; align-items: center; }
+.lobby > * { width: 100%; }
+.lobby > .btn.small { width: auto; }
+.eyebrow { margin: 0; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+.code { font-family: var(--type); font-size: clamp(3rem, 16vw, 4.5rem); font-weight: 700; letter-spacing: .12em; color: var(--stamp); line-height: 1; margin-bottom: 4px; }
+.code.small { font-size: 2rem; letter-spacing: 0; }
+.lobby h2 { margin: 24px 0 0; font-size: 1.1rem; text-align: left; }
+.dim { color: var(--dim); font-weight: 400; }
+.plist { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
+.plist li { padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; margin-top: 8px; font-weight: 700; }
+.plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
+.plist.rank li { display: flex; justify-content: space-between; }
+.plist.rank li:first-child { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+/* game */
+.bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
+.bar b { color: var(--stamp); letter-spacing: .1em; }
+.scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
+.scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--paper); border: 2px solid var(--line); border-radius: 6px; padding: 6px 8px 6px 12px; font-size: .9rem; }
+.scores li.me .nm { text-decoration: underline; text-underline-offset: 3px; }
+.scores li.det { border-color: var(--ink); }
+.scores li.off { opacity: .4; }
+.scores .mk { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--stamp); font-weight: 700; }
+.scores b { background: var(--bg); border-radius: 4px; min-width: 26px; text-align: center; padding: 2px 6px; }
+
+.table { max-width: 1080px; margin: 0 auto; padding: 8px 20px 120px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 800px) {
+  .table { grid-template-columns: 320px minmax(0, 1fr); align-items: start; }
+  .prompt { position: sticky; top: 16px; }
+}
+.case { background: var(--paper); border: 2px solid var(--ink); border-radius: var(--radius); padding: 20px; box-shadow: 5px 5px 0 var(--ink); }
+.case .no { font-family: var(--type); font-size: .85rem; letter-spacing: .1em; text-transform: uppercase; color: var(--stamp); font-weight: 700; margin: 0 0 10px; }
+.case h2 { font-family: var(--type); margin: 0; font-size: 1.3rem; line-height: 1.25; }
+.case .ask { margin: 14px 0 0; font-weight: 700; color: var(--dim); }
+
+.status { margin: 0 0 14px; font-size: 1.15rem; font-weight: 700; }
+.stmt { font-family: var(--type); font-size: 1.08rem; line-height: 1.45; background: var(--paper); border: 1px solid var(--line); border-left: 5px solid var(--ink); border-radius: 4px; padding: 14px; margin: 0; }
+.stmt b.who { color: var(--who); } .stmt b.what { color: var(--what); } .stmt b.where { color: var(--where); }
+.stmt .gap { display: inline-block; width: 4em; border-bottom: 2px solid var(--dim); }
+.lbl { margin: 18px 0 8px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.lbl.who { color: var(--who); } .lbl.what { color: var(--what); } .lbl.where { color: var(--where); }
+.grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.card {
+  position: relative; display: block; width: 100%; text-align: left;
+  background: var(--paper); border: 2px solid var(--line); border-left-width: 6px; border-radius: 6px;
+  padding: 10px 12px; font-weight: 700; font-size: .97rem; line-height: 1.25; min-height: 64px;
+  cursor: pointer; transition: transform .1s, box-shadow .1s;
+}
+.card.who { border-left-color: var(--who); } .card.what { border-left-color: var(--what); } .card.where { border-left-color: var(--where); }
+.card:hover { transform: translateY(-2px); }
+.card.sel { border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); transform: translateY(-3px); }
+.backs { display: flex; gap: 8px; flex-wrap: wrap; }
+.backs div { width: 70px; height: 90px; border-radius: 6px; border: 2px solid var(--line); background: repeating-linear-gradient(45deg, #ddd0b2 0 8px, #e6dbc1 8px 16px); }
+
+.subs { display: grid; gap: 12px; }
+.sub { position: relative; display: block; width: 100%; text-align: left; background: none; border: 2px solid transparent; border-radius: 8px; padding: 4px; }
+button.sub { cursor: pointer; }
+button.sub:hover { border-color: var(--line); }
+.sub.sel { border-color: var(--ink); }
+.sub.win { border-color: var(--stamp); }
+.sub .who-said { font-size: .85rem; font-weight: 700; color: var(--dim); padding: 6px 6px 2px; }
+.sub.win .who-said::after {
+  content: "FREE TO GO"; font-family: var(--type); color: var(--stamp); border: 2px solid var(--stamp);
+  border-radius: 4px; padding: 1px 8px; margin-left: 10px; display: inline-block; transform: rotate(-3deg);
+}
+
+.action { margin-top: 20px; }
+@media (max-width: 799px) {
+  .case h2 { font-size: 1.12rem; }
+  .action:not(:empty) { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); z-index: 5; }
+  .action .btn { width: 100%; }
+}
+
+/* overlay & toast */
+.overlay { position: fixed; inset: 0; background: rgba(29, 26, 22, .7); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--paper); border-radius: var(--radius); padding: 24px; max-width: 380px; }
+.dialog h2 { margin: 0 0 8px; }
+.dialog p { color: var(--dim); margin: 0 0 18px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: var(--paper); font-weight: 700; padding: 10px 18px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- PeerJS: browser-to-browser connections, no server of your own needed -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+/* =====================================================
+   THE CARDS. Edit freely: one card per line, in quotes,
+   with a comma after each.
+
+   An alibi is read as:
+     "I was with [WHO], [WHAT] [WHERE]."
+   so keep new cards in the same shape as the others.
+   ===================================================== */
+
+// The crimes. The game adds "Where were you?" after each one.
+const CRIMES = [
+  "Someone released forty ferrets into the office.",
+  "Someone replaced the communion wine with tequila.",
+  "Someone drew a huge penis on the mayor's lawn in weedkiller.",
+  "Someone stole every left shoe from the bowling alley.",
+  "Someone ate the entire wedding cake before the ceremony.",
+  "Someone sent a nude to the whole company mailing list.",
+  "Someone filled the church organ with custard.",
+  "Someone taught the vicar's parrot the F-word.",
+  "Someone has been posting used underwear through the library's returns slot.",
+  "Someone stole a mobility scooter and led police on a four-hour chase.",
+  "Someone swapped the retirement home's bingo prizes for edibles.",
+  "Someone broke into the zoo and gave the llamas haircuts.",
+  "Someone streaked through the garden centre during pensioners' discount hour.",
+  "Someone replaced all the hospital hand sanitiser with lube.",
+  "Someone stole the neighbours' hot tub. While it was full.",
+  "Someone glued googly eyes to every statue in town. Including the tasteful nude.",
+  "Someone signed Grandma up for nine dating apps.",
+  "Someone put a \"For Sale\" sign on the police station.",
+  "Someone spiked the bake sale brownies.",
+  "Someone has been breaking into homes and moving the furniture slightly.",
+  "Someone left a one-star review for a funeral.",
+  "Someone rode a lawnmower through the drive-through, naked.",
+  "Someone hacked the stadium screen to show their own honeymoon video.",
+  "Someone stole 200 garden gnomes and arranged them in an orgy.",
+  "Someone faked their own death to get out of a baby shower.",
+  "Someone replaced the office coffee with gravy.",
+  "Someone has been sexting from the mayor's phone.",
+  "Someone tried to pay for a lap dance with a library card.",
+  "Someone got married in Vegas using your name.",
+  "Someone set fire to the \"Live, Laugh, Love\" aisle.",
+  "Someone leaked a sex tape. It stars the team mascot costume.",
+  "Someone swapped Grandpa's ashes for protein powder.",
+  "Someone keeps peeing in the office plant. It's thriving.",
+  "Someone has been posing as a priest and hearing confessions for the gossip.",
+  "Someone broke into the bakery and took only the cream horns.",
+  "Someone crashed the nudist colony's annual meeting fully clothed.",
+  "Someone added all of HR to a group chat called \"Hot or Not\".",
+  "Someone taught the yoga class a pose that got six people stuck together.",
+  "Someone had 400 inflatable dolls delivered to the vicarage.",
+  "Someone got the town's water supply slightly drunk.",
+  "Someone stole the mall Santa's sleigh. It was found outside a strip club.",
+  "Someone changed every hotel \"Do Not Disturb\" sign to \"Please Join In\".",
+  "Someone left bite marks on the wax museum.",
+  "Someone has been running an illegal casino in the church hall.",
+  "Someone shaved the neighbour's prize poodle into the shape of a bum."
+];
+
+// WHO you were with.  "I was with ..."
+const WHO = [
+  "my chiropractor",
+  "a man who says he's my real dad",
+  "three off-duty clowns",
+  "my ex's new, hotter partner",
+  "a very flexible accountant",
+  "the entire brass section",
+  "my parole officer",
+  "two nuns on a hen night",
+  "a stripper named Gravy",
+  "my mother-in-law",
+  "a goat I'd rather not discuss",
+  "my sex therapist",
+  "a hitchhiker dressed as a hot dog",
+  "the groom's side of the family",
+  "a retired dominatrix",
+  "my emotional support bouncer",
+  "the treasurer of a swingers' club",
+  "a man in a full gimp suit",
+  "my landlord",
+  "your wife",
+  "a priest having a crisis of faith",
+  "a married couple who \"saw me across the bar\"",
+  "an Elvis impersonator out on bail",
+  "my sponsor",
+  "a magician who wouldn't take the hint",
+  "a naked man holding a trombone",
+  "my boss and his \"personal trainer\"",
+  "a hen party in matching sashes",
+  "the ghost of my virginity",
+  "my dealer's mum",
+  "a tantric yoga instructor",
+  "a man who only answers to \"Big Ken\"",
+  "six sunburnt rugby players",
+  "my divorce lawyer",
+  "half a furry convention",
+  "my gynaecologist, socially",
+  "a one-night stand who won't leave",
+  "a cult recruiter, and they were lovely",
+  "a taxidermist with wandering hands",
+  "all of the bridesmaids",
+  "a pensioner with a hip flask and no boundaries",
+  "an off-duty mall Santa",
+  "someone I met in a hot tub",
+  "my twin, who is the pretty one",
+  "a doomsday prepper named Darren",
+  "a life coach who lives in his car",
+  "the hot priest",
+  "my urologist",
+  "a mime who'd had too much",
+  "two people in one horse costume",
+  "an erotic novelist doing \"research\"",
+  "a guy who sells knives from a van",
+  "my nan and her new boyfriend",
+  "a stag do dressed as nuns",
+  "a very thorough masseur",
+  "the neighbourhood watch",
+  "a woman who breeds illegal hamsters",
+  "my pole-dancing instructor",
+  "a sommelier who was already drunk",
+  "my imaginary girlfriend"
+];
+
+// WHAT you were doing.  "... crying into a burrito ..."
+const WHAT = [
+  "crying into a burrito",
+  "learning to pole dance",
+  "getting matching tattoos",
+  "skinny dipping",
+  "doing body shots",
+  "playing strip Scrabble",
+  "trying to get the handcuffs off",
+  "googling \"is it supposed to bend like that\"",
+  "eating cheese in the dark",
+  "rehearsing our safe word",
+  "getting waxed for charity",
+  "giving a slideshow about my exes",
+  "losing my trousers in a bet",
+  "testing how many of us fit in the bath",
+  "apologising to a horse",
+  "singing very sad karaoke",
+  "slow dancing to the ice cream van jingle",
+  "hiding from my husband",
+  "sharing one enormous margarita",
+  "comparing rashes",
+  "wrestling in baked beans",
+  "getting stuck in a wetsuit",
+  "filming something \"for private use\"",
+  "reading erotic fan fiction aloud",
+  "drinking wine out of a shoe",
+  "making out like it was 1999",
+  "taking a couples' pottery class",
+  "being asked to leave the buffet",
+  "arguing over who's the big spoon",
+  "watching a threesome fall apart over logistics",
+  "practising my lap dance",
+  "untangling a sex swing",
+  "getting a suspicious mole looked at",
+  "doing shots off a stranger's stomach",
+  "streaking for a good cause",
+  "faking an orgasm, for practice",
+  "returning a faulty vibrator",
+  "having the worst sex of my life",
+  "having the best sex of their life",
+  "being oiled up for a charity calendar",
+  "getting thrown out of a strip club for crying",
+  "inventing a new position and pulling a hamstring",
+  "sexting my ex from someone else's phone",
+  "sculpting my own bum out of clay",
+  "drinking to forget the last time",
+  "shaving somewhere I couldn't reach",
+  "trying to work out whose underwear this is",
+  "licking salt off things for money",
+  "blacking out at a gender reveal",
+  "playing \"never have I ever\" until someone cried",
+  "doing the walk of shame in advance",
+  "getting married as a joke",
+  "judging a wet T-shirt contest",
+  "performing an exorcism on a waterbed",
+  "selling feet pics",
+  "smoking something a stranger called \"homemade\"",
+  "writing a strongly worded letter to my ex",
+  "taking a pregnancy test for fun",
+  "arm wrestling for custody of the dog",
+  "explaining the rash"
+];
+
+// WHERE it happened.  "... in the back of a hearse."
+const WHERE = [
+  "in the back of a hearse",
+  "at a swingers' resort",
+  "behind the bins",
+  "in a hot tub that wasn't ours",
+  "at my ex's wedding",
+  "in the confessional booth",
+  "on the roof of a kebab shop",
+  "in a furniture showroom bed",
+  "at an all-you-can-eat buffet",
+  "in the toilets at a garden centre",
+  "at a funeral, near the back",
+  "in a bouncy castle for adults",
+  "on a pedalo",
+  "in a photo booth",
+  "at my parents' anniversary dinner",
+  "in a sex dungeon with surprisingly good parking",
+  "at a nudist beach in February",
+  "in the car park of a sexual health clinic",
+  "on a party bus",
+  "in a tent at a festival I don't remember",
+  "in the cheese aisle",
+  "at a strip club's lunch buffet",
+  "in a motel that charges by the hour",
+  "in a lift that was stuck for six hours",
+  "under the table at a wine tasting",
+  "in my landlord's bed",
+  "on a waterbed with a slow leak",
+  "in a hedge",
+  "at a silent retreat",
+  "in a canoe",
+  "at a tantric workshop in a village hall",
+  "in a karaoke booth",
+  "on the night bus",
+  "in a sauna with too much eye contact",
+  "at a regional sales conference",
+  "in the vicar's shed",
+  "at a hen party in a caravan park",
+  "in a field, for reasons",
+  "in the walk-in fridge at work",
+  "on a mechanical bull",
+  "in a department store changing room",
+  "at a medieval-themed restaurant",
+  "in a van with blacked-out windows",
+  "at an open-casket viewing",
+  "in a jacuzzi suite we couldn't afford",
+  "on a cruise for the over-seventies",
+  "at couples' counselling",
+  "in a taxi going the wrong way",
+  "in A&E, again",
+  "at the after-party of an after-party",
+  "on a bench outside a brothel",
+  "in a stranger's kitchen at 5 a.m.",
+  "at a wife-swapping barbecue",
+  "in the splash zone at a dolphin show",
+  "in a cornfield off the motorway",
+  "at a foam party in a retirement village",
+  "in the stockroom",
+  "in an escape room we could not escape",
+  "in the bushes outside your house",
+  "in a honeymoon suite. Not on my honeymoon"
+];
+
+/* =====================================================
+   THE GAME. The player who creates the room is the host:
+   their browser holds the real game state and sends each
+   player only what they are allowed to see.
+   ===================================================== */
+(() => {
+  'use strict';
+
+  const PREFIX = 'likelystory-v1-';
+  const TYPES = ['who', 'what', 'where'];
+  const DECKS = { who: WHO, what: WHAT, where: WHERE };
+  const LABEL = { who: 'Who were you with?', what: 'What were you doing?', where: 'Where?' };
+  const HAND = 4;                       // cards of each type
+  const MIN_PLAYERS = 3, MAX_PLAYERS = 10;
+  const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+  const $app = document.getElementById('app');
+  const $toast = document.getElementById('toast');
+
+  const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
+  const save = (store, k, v) => { try { window[store].setItem(k, v); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const makeCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
+  const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+
+  let myPid = load('sessionStorage', 'ls_pid');
+  if (!myPid) { myPid = Math.random().toString(36).slice(2, 12); save('sessionStorage', 'ls_pid', myPid); }
+  let myName = load('localStorage', 'ls_name') || '';
+  let roomCode = cleanCode(new URLSearchParams(location.search).get('room'));
+
+  let peer = null, hostConn = null, isHost = false;
+  let G = null;        // full game state (host only)
+  let view = null;     // what this player is allowed to see
+  let busy = '', homeErr = '', lost = false, joinTimer = null;
+  let sel = {}, pickIdx = null, selKey = '';
+
+  /* ---------------- HOST ---------------- */
+  const P = pid => G.players.find(p => p.pid === pid);
+  const emptyHand = () => ({ who: [], what: [], where: [] });
+
+  function createRoom() {
+    isHost = true;
+    const code = makeCode();
+    busy = 'Creating room…'; render();
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      busy = ''; roomCode = code;
+      G = {
+        code, phase: 'lobby', goal: 5, round: 0, hostPid: myPid,
+        players: [newPlayer(myPid, myName, null)],
+        detPid: null, crime: null, table: [], winnerPid: null,
+        decks: {}, crimes: []
+      };
+      setRoomUrl(code);
+      sync();
+    });
+    peer.on('connection', conn => {
+      conn.on('data', msg => {
+        if (!G || !msg || typeof msg !== 'object') return;
+        if (msg.t === 'join') hostJoin(conn, msg);
+        else if (conn.pid) handle(conn.pid, msg);
+      });
+      conn.on('close', () => hostLeave(conn));
+      conn.on('error', () => hostLeave(conn));
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
+      else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function newPlayer(pid, name, conn) {
+    return { pid, name, score: 0, hand: emptyHand(), alibi: null, conn, connected: true };
+  }
+
+  function hostJoin(conn, msg) {
+    const pid = String(msg.pid || '').slice(0, 20);
+    const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
+    if (!pid) return;
+    let p = P(pid);
+    if (p) {                                   // same player coming back
+      if (p.pid === G.hostPid) return;
+      const old = p.conn;
+      p.conn = conn; p.connected = true; p.name = name;
+      if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    } else {
+      if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
+      p = newPlayer(pid, name, conn);
+      G.players.push(p);
+      if (G.phase !== 'lobby' && G.phase !== 'gameover') refill(p);
+    }
+    conn.pid = pid;
+    sync();
+  }
+
+  function hostLeave(conn) {
+    if (!G || !conn.pid) return;
+    const p = P(conn.pid);
+    if (!p || p.conn !== conn) return;
+    p.conn = null; p.connected = false;
+    if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
+    if (p.pid === G.detPid && (G.phase === 'alibi' || G.phase === 'judging')) {
+      toastAll(p.name + ' (the detective) dropped out. Case closed.');
+      startRound(); return;
+    }
+    maybeJudge();
+    sync();
+  }
+
+  function draw(k) {
+    const d = G.decks[k];
+    if (!d.draw.length) { d.draw = shuffle(d.discard); d.discard = []; }
+    return d.draw.pop();
+  }
+  function refill(p) {
+    TYPES.forEach(k => {
+      while (p.hand[k].length < HAND) { const c = draw(k); if (c === undefined) break; p.hand[k].push(c); }
+    });
+  }
+
+  function startGame() {
+    G.decks = {};
+    TYPES.forEach(k => { G.decks[k] = { draw: shuffle([...new Set(DECKS[k])]), discard: [] }; });
+    G.crimes = shuffle(CRIMES);
+    G.round = 0; G.detPid = null;
+    G.players = G.players.filter(p => p.connected);
+    G.players.forEach(p => { p.score = 0; p.hand = emptyHand(); p.alibi = null; });
+    startRound();
+  }
+
+  function startRound() {
+    G.players.forEach(p => {
+      if (p.alibi) { TYPES.forEach((k, i) => G.decks[k].discard.push(p.alibi[i])); p.alibi = null; }
+    });
+    G.table = []; G.winnerPid = null;
+    const live = G.players.filter(p => p.connected);
+    if (live.length < 2) {
+      G.players = live; G.phase = 'lobby';
+      toastAll('Not enough players left. Back to the lobby.');
+      sync(); return;
+    }
+    const n = G.players.length;
+    const cur = G.players.findIndex(p => p.pid === G.detPid);
+    for (let i = 1; i <= n; i++) {
+      const cand = G.players[(cur + i + n) % n];
+      if (cand.connected) { G.detPid = cand.pid; break; }
+    }
+    if (!G.crimes.length) G.crimes = shuffle(CRIMES);
+    G.crime = G.crimes.pop();
+    G.round++;
+    G.players.forEach(refill);
+    G.phase = 'alibi';
+    sync();
+  }
+
+  function maybeJudge() {
+    if (G.phase !== 'alibi') return;
+    const need = G.players.filter(p => p.connected && p.pid !== G.detPid);
+    if (need.length && need.every(p => p.alibi)) {
+      G.table = shuffle(G.players.filter(p => p.alibi).map(p => ({ pid: p.pid, cards: p.alibi })));
+      G.phase = 'judging';
+    }
+  }
+
+  // Every player action lands here (the host's own actions too).
+  function handle(pid, msg) {
+    const p = P(pid);
+    if (!p) return;
+    const amHost = pid === G.hostPid, amDet = pid === G.detPid;
+    switch (msg.t) {
+      case 'goal':
+        if (amHost && G.phase === 'lobby') { G.goal = Math.min(15, Math.max(3, parseInt(msg.goal, 10) || 5)); sync(); }
+        break;
+      case 'start':
+        if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
+            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+        break;
+      case 'alibi': {
+        if (G.phase !== 'alibi' || amDet || p.alibi) return;
+        const c = msg.cards || {};
+        if (!TYPES.every(k => p.hand[k].includes(c[k]))) return;
+        TYPES.forEach(k => { p.hand[k] = p.hand[k].filter(x => x !== c[k]); });
+        p.alibi = TYPES.map(k => c[k]);
+        refill(p); maybeJudge(); sync();
+        break;
+      }
+      case 'pick': {
+        if (G.phase !== 'judging' || !amDet) return;
+        const s = G.table[msg.i];
+        if (!s) return;
+        G.winnerPid = s.pid;
+        const w = P(s.pid); if (w) w.score++;
+        G.phase = 'result';
+        sync();
+        break;
+      }
+      case 'next':
+        if (G.phase !== 'result' || !(amHost || amDet)) return;
+        if (G.players.some(x => x.score >= G.goal)) { G.phase = 'gameover'; sync(); }
+        else startRound();
+        break;
+      case 'lobby':
+        if (amHost && G.phase === 'gameover') {
+          G.players = G.players.filter(x => x.connected);
+          G.players.forEach(x => { x.score = 0; x.hand = emptyHand(); x.alibi = null; });
+          G.phase = 'lobby'; sync();
+        }
+        break;
+    }
+  }
+
+  function viewFor(pid) {
+    const me = P(pid), ph = G.phase;
+    const open = ph === 'judging' || ph === 'result';
+    return {
+      code: G.code, phase: ph, goal: G.goal, round: G.round,
+      you: pid, hostPid: G.hostPid, detPid: G.detPid, winnerPid: G.winnerPid, crime: G.crime,
+      players: G.players.map(p => ({ pid: p.pid, name: p.name, score: p.score, connected: p.connected, done: !!p.alibi })),
+      hand: me ? me.hand : emptyHand(),
+      mine: me ? me.alibi : null,
+      table: open ? G.table.map(s => ({ cards: s.cards, pid: ph === 'result' ? s.pid : null })) : null
+    };
+  }
+
+  function sync() {
+    G.players.forEach(p => {
+      if (p.conn && p.conn.open) { try { p.conn.send({ t: 'state', v: viewFor(p.pid) }); } catch (e) {} }
+    });
+    view = viewFor(myPid);
+    render();
+  }
+
+  function toastAll(text) {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', text }); } catch (e) {} } });
+    toast(text);
+  }
+
+  /* ---------------- GUEST ---------------- */
+  function joinRoom(code) {
+    isHost = false; roomCode = code;
+    busy = 'Joining ' + code + '…'; render();
+    peer = new Peer();
+    joinTimer = setTimeout(() => joinFail('Could not find that room. Check the code and make sure the host still has the game open.'), 15000);
+    peer.on('open', () => connectHost());
+    peer.on('error', err => {
+      if (err.type === 'peer-unavailable') {
+        if (view) { lost = true; render(); }
+        else joinFail('No room with that code. Check it and try again.');
+      } else if (!view) joinFail('Connection problem. Check your internet and try again.');
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function connectHost() {
+    const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+    hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('data', msg => {
+      if (!msg || conn !== hostConn) return;
+      if (msg.t === 'state') {
+        clearTimeout(joinTimer); busy = ''; lost = false;
+        if (!view) setRoomUrl(roomCode);
+        view = msg.v; render();
+      } else if (msg.t === 'toast') toast(msg.text);
+      else if (msg.t === 'full') joinFail('That room is full.');
+    });
+    conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(); } });
+  }
+
+  function joinFail(text) {
+    clearTimeout(joinTimer);
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
+    render();
+  }
+
+  function act(msg) {
+    if (isHost) handle(myPid, msg);
+    else if (hostConn && hostConn.open) hostConn.send(msg);
+  }
+
+  /* ---------------- RENDERING ---------------- */
+  function setRoomUrl(code) {
+    try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  }
+  const shareUrl = () => location.origin + location.pathname + '?room=' + view.code;
+
+  let toastTimer = null;
+  function toast(text) {
+    $toast.textContent = text; $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
+  }
+
+  // "I was with [who], [what] [where]."  Missing parts show as gaps.
+  function stmtHTML(cards) {
+    const part = (i) => cards[i] !== undefined && cards[i] !== null
+      ? '<b class="' + TYPES[i] + '">' + esc(cards[i]) + '</b>' : '<span class="gap"></span>';
+    return '<p class="stmt">“I was with ' + part(0) + ', ' + part(1) + ' ' + part(2) + '.”</p>';
+  }
+
+  function render() {
+    if (!view) { $app.innerHTML = homeHTML(); return; }
+    const key = view.round + ':' + view.phase;
+    if (key !== selKey) { selKey = key; sel = {}; pickIdx = null; }
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    if (lost) {
+      html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2>' +
+        '<p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button>' +
+        '<button class="btn" data-act="leave">Leave</button></div></div></div>';
+    }
+    $app.innerHTML = html;
+  }
+
+  function homeHTML() {
+    const dis = busy ? ' disabled' : '';
+    return '<main class="home">' +
+      '<h1 class="logo">Likely<br>Story<i>.</i></h1>' +
+      '<p class="tag">A crime has been committed. Your alibi is worse.</p>' +
+      '<label class="field"><span>Your name</span>' +
+      '<input id="name" maxlength="16" autocomplete="off" placeholder="e.g. Gary" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>Create a room</button>' +
+      '<div class="or"><span>or join with a code</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
+      (busy ? '<p class="note">' + esc(busy) + '</p>' : '') +
+      (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
+      '<ol class="how"><li>Each round, one player is the detective and a crime is read out.</li>' +
+      '<li>Everyone else is a suspect and builds an alibi from three cards: who they were with, what they were doing, and where.</li>' +
+      '<li>The detective reads the alibis and lets one suspect walk. That suspect scores.</li></ol>' +
+      '<p class="fine">' + MIN_PLAYERS + ' to ' + MAX_PLAYERS + ' players, each on their own phone or laptop. Adult humour, 18+.</p>' +
+      '</main>';
+  }
+
+  function lobbyHTML() {
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const goals = [3, 5, 7, 10].map(g => '<option value="' + g + '"' + (g === v.goal ? ' selected' : '') + '>' + g + ' points</option>').join('');
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Room code</p>' +
+      '<div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">Copy invite link</button>' +
+      '<h2>Suspects <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p =>
+        '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
+      (amHost
+        ? '<label class="field inline"><span>First to</span><select id="goal">' + goals + '</select></label>' +
+          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
+          (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
+          '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
+        : '<p class="note">Waiting for the host to start. First to ' + v.goal + ' points wins.</p>') +
+      '</main>';
+  }
+
+  function scoresHTML() {
+    const v = view;
+    return '<ul class="scores">' + v.players.map(p => {
+      const det = p.pid === v.detPid;
+      const mark = det ? 'detective' : (v.phase === 'alibi' && p.done ? '✓' : '');
+      return '<li class="' + (det ? 'det ' : '') + (p.connected ? '' : 'off ') + (p.pid === v.you ? 'me' : '') + '">' +
+        '<span class="nm">' + esc(p.name) + '</span>' +
+        (mark ? '<span class="mk">' + mark + '</span>' : '') +
+        '<b>' + p.score + '</b></li>';
+    }).join('') + '</ul>';
+  }
+
+  function gameHTML() {
+    const v = view, ph = v.phase;
+    const amDet = v.you === v.detPid, amHost = v.you === v.hostPid;
+    const name = pid => { const p = v.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+    const det = esc(name(v.detPid));
+    const waiting = v.players.filter(p => p.connected && p.pid !== v.detPid && !p.done).length;
+    const more = waiting + ' more suspect' + (waiting === 1 ? '' : 's');
+    let status = '', body = '', action = '';
+
+    if (ph === 'alibi') {
+      if (amDet) {
+        status = 'You are the detective. The suspects are getting their stories straight. Waiting on ' + more + '.';
+        body = '<div class="backs">' + v.players.filter(p => p.pid !== v.detPid && p.done).map(() => '<div></div>').join('') + '</div>';
+      } else if (v.mine) {
+        status = 'Statement signed. Waiting on ' + more + '.';
+        body = stmtHTML(v.mine);
+      } else {
+        status = 'Build your alibi. Pick one card from each row.';
+        body = stmtHTML(TYPES.map(k => sel[k] !== undefined ? v.hand[k][sel[k]] : null)) +
+          TYPES.map(k => '<p class="lbl ' + k + '">' + LABEL[k] + '</p><div class="grid">' +
+            v.hand[k].map((c, i) => '<button class="card ' + k + (sel[k] === i ? ' sel' : '') + '" data-act="sel" data-k="' + k + '" data-i="' + i + '">' + esc(c) + '</button>').join('') +
+            '</div>').join('');
+        action = '<button class="btn primary big" data-act="submit"' + (TYPES.every(k => sel[k] !== undefined) ? '' : ' disabled') + '>Swear to it</button>';
+      }
+    } else {
+      const result = ph === 'result';
+      if (result) {
+        status = det + ' believes ' + esc(name(v.winnerPid)) + '. Somehow.';
+        action = (amDet || amHost)
+          ? '<button class="btn primary big" data-act="next">Next case</button>'
+          : '<p class="note">Waiting for ' + det + ' to continue.</p>';
+      } else if (amDet) {
+        status = 'Read the alibis out loud, detective. Then let one suspect walk.';
+        action = '<button class="btn primary big" data-act="confirm"' + (pickIdx === null ? ' disabled' : '') + '>Free to go</button>';
+      } else {
+        status = det + ' is reviewing the statements.';
+      }
+      body = '<div class="subs">' + v.table.map((s, i) => {
+        const cls = 'sub' + (result && s.pid === v.winnerPid ? ' win' : '') + (!result && pickIdx === i ? ' sel' : '');
+        const inner = (result ? '<div class="who-said">' + esc(name(s.pid)) + '</div>' : '') + stmtHTML(s.cards);
+        return (!result && amDet)
+          ? '<button class="' + cls + '" data-act="pick" data-i="' + i + '">' + inner + '</button>'
+          : '<div class="' + cls + '">' + inner + '</div>';
+      }).join('') + '</div>';
+    }
+
+    return '<header class="bar"><span>Room <b>' + esc(v.code) + '</b></span><span>Case ' + v.round + '</span><span>First to ' + v.goal + '</span></header>' +
+      scoresHTML() +
+      '<main class="table">' +
+      '<section class="prompt"><div class="case"><p class="no">Case file #' + v.round + '</p><h2>' + esc(v.crime) + '</h2>' +
+      '<p class="ask">Where were you last night?</p></div></section>' +
+      '<section class="play"><p class="status">' + status + '</p>' + body + '<div class="action">' + action + '</div></section>' +
+      '</main>';
+  }
+
+  function overHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Case closed</p>' +
+      '<div class="code small">' + esc(ranked[0].name) + ' gets away with it</div>' +
+      '<ul class="plist rank">' + ranked.map((p, i) =>
+        '<li><span>' + (i + 1) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      (amHost
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
+          '<button class="btn" data-act="lobby">Back to lobby</button>'
+        : '<p class="note">Waiting for the host to start another game.</p>') +
+      '</main>';
+  }
+
+  /* ---------------- EVENTS ---------------- */
+  function readName() {
+    myName = myName.trim().slice(0, 16);
+    if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
+    save('localStorage', 'ls_name', myName);
+    homeErr = '';
+    return true;
+  }
+
+  $app.addEventListener('input', e => {
+    if (e.target.id === 'name') myName = e.target.value;
+    if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+  });
+  $app.addEventListener('change', e => {
+    if (e.target.id === 'goal') act({ t: 'goal', goal: e.target.value });
+  });
+  $app.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'code') go('join');
+  });
+  $app.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el && !el.disabled) go(el.dataset.act, el);
+  });
+
+  function go(a, el) {
+    const i = el && el.dataset.i !== undefined ? parseInt(el.dataset.i, 10) : null;
+    switch (a) {
+      case 'create':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (readName()) createRoom();
+        break;
+      case 'join':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (!readName()) return;
+        if (roomCode.length !== 5) { homeErr = 'Room codes are 5 letters.'; render(); return; }
+        joinRoom(roomCode);
+        break;
+      case 'copy': {
+        const url = shareUrl();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'), () => prompt('Copy this link:', url));
+        else prompt('Copy this link:', url);
+        break;
+      }
+      case 'start': act({ t: 'start' }); break;
+      case 'lobby': act({ t: 'lobby' }); break;
+      case 'sel': {
+        const k = el.dataset.k;
+        if (sel[k] === i) delete sel[k]; else sel[k] = i;
+        render();
+        break;
+      }
+      case 'submit':
+        if (TYPES.every(k => sel[k] !== undefined)) {
+          const cards = {};
+          TYPES.forEach(k => { cards[k] = view.hand[k][sel[k]]; });
+          act({ t: 'alibi', cards });
+        }
+        break;
+      case 'pick': pickIdx = i; render(); break;
+      case 'confirm': if (pickIdx !== null) act({ t: 'pick', i: pickIdx }); break;
+      case 'next': act({ t: 'next' }); break;
+      case 'reconnect':
+        toast('Reconnecting…');
+        if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+        if (peer && !peer.destroyed) connectHost();
+        break;
+      case 'leave': location.href = location.pathname; break;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
