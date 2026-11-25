@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clap Back — two answers, one winner</title>
+<meta name="description" content="Everyone answers silly prompts, then votes on the funnier answer. No main screen, no timers. English and Thai.">
+<style>
+:root {
+  --bg: #f3e6bd;
+  --ink: #2d2a26;
+  --paper: #fffcf4;
+  --dim: #6b634f;
+  --pink: #d9567f;
+  --blue: #4c68c9;
+  --radius: 14px;
+  --shadow: 4px 4px 0 var(--ink);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", Thonburi, "Leelawadee UI", Tahoma, sans-serif;
+  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+html[lang=th] body { line-height: 1.6; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.btn {
+  appearance: none; border: 3px solid var(--ink); background: var(--paper);
+  font-weight: 800; padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink); transition: transform .08s, box-shadow .08s;
+}
+.btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+.btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--pink); color: #fff; }
+.btn.big { padding: 14px 24px; font-size: 1.05rem; }
+.btn.small { padding: 6px 12px; font-size: .9rem; box-shadow: 2px 2px 0 var(--ink); }
+.field { display: block; text-align: left; margin: 0 0 14px; }
+.field span { display: block; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.field.inline { display: flex; align-items: center; gap: 12px; }
+.field.inline span { margin: 0; }
+input, select { width: 100%; background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
+select { width: auto; }
+input::placeholder { color: #a39a80; font-weight: 400; }
+.seg { display: flex; gap: 8px; }
+.seg .btn { flex: 1; }
+.seg .btn.sel { background: var(--ink); color: var(--paper); }
+.lang { position: fixed; top: 10px; right: 12px; z-index: 6; }
+
+.home, .lobby { max-width: 420px; margin: 0 auto; padding: 44px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+.logo { font-size: clamp(3.4rem, 18vw, 5.2rem); line-height: .88; letter-spacing: -.04em; margin: 0; font-weight: 900; }
+.logo i { font-style: normal; color: var(--pink); }
+.tag { margin: 6px 0 14px; font-size: 1.1rem; font-weight: 700; }
+.or { display: flex; align-items: center; gap: 12px; font-size: .85rem; font-weight: 700; margin: 8px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 3px; background: var(--ink); border-radius: 2px; }
+.joinrow { display: flex; gap: 10px; }
+.joinrow input { text-transform: uppercase; letter-spacing: .25em; font-size: 1.2rem; text-align: center; min-width: 0; }
+.joinrow input::placeholder { letter-spacing: normal; }
+.joinrow .btn { flex: none; white-space: nowrap; }
+.note { color: var(--dim); margin: 8px 0 0; font-weight: 600; }
+.err { color: #b3001b; font-weight: 800; margin: 8px 0 0; }
+.fine { color: var(--dim); font-size: .85rem; margin: 14px 0 0; }
+.how { margin: 18px 0 0; padding: 16px 16px 16px 34px; background: var(--paper); border: 3px solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); font-size: .95rem; }
+.how li { margin-bottom: 6px; }
+.how li:last-child { margin: 0; }
+.lobby { text-align: center; align-items: center; }
+.lobby > * { width: 100%; }
+.lobby > .btn.small { width: auto; }
+.eyebrow { margin: 0; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.code { font-size: clamp(3rem, 16vw, 4.5rem); font-weight: 900; letter-spacing: .12em; line-height: 1.1; margin-bottom: 4px; }
+.code.small { font-size: 2rem; letter-spacing: 0; line-height: 1.25; }
+.lobby h2 { margin: 22px 0 0; font-size: 1.1rem; text-align: left; }
+.dim { color: var(--dim); font-weight: 500; }
+.plist { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
+.plist li { padding: 12px 14px; background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; margin-top: 8px; font-weight: 800; }
+.plist em { font-style: normal; font-weight: 500; font-size: .8rem; color: var(--dim); margin-left: 6px; }
+.plist.rank li { display: flex; justify-content: space-between; }
+.plist.rank li.top { background: var(--pink); color: #fff; }
+
+.bar { display: flex; gap: 14px; padding: 12px 84px 12px 20px; font-size: .85rem; font-weight: 700; border-bottom: 3px solid var(--ink); flex-wrap: wrap; }
+.bar b { letter-spacing: .1em; }
+.scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
+.scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: .9rem; font-weight: 700; }
+.scores li.me .nm { text-decoration: underline; text-underline-offset: 3px; }
+.scores li.off { opacity: .4; }
+.scores .mk { color: var(--blue); font-weight: 900; }
+.scores b { background: var(--ink); color: var(--paper); border-radius: 999px; min-width: 26px; text-align: center; padding: 2px 6px; }
+
+.stage { max-width: 600px; margin: 0 auto; padding: 8px 20px 130px; }
+.status { margin: 8px 0 0; font-size: 1.15rem; font-weight: 800; }
+.q { margin: 16px 0 0; background: var(--ink); color: var(--paper); border-radius: var(--radius); padding: 18px; }
+.q p { margin: 0; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--bg); }
+.q h2 { margin: 6px 0 0; font-size: 1.4rem; line-height: 1.3; }
+.q input { margin-top: 14px; color: var(--ink); }
+.q .mine { margin: 12px 0 0; font-weight: 700; text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--paper); }
+.q .mine b { color: var(--bg); }
+.vs { display: grid; gap: 14px; margin: 18px 0 0; }
+.ans {
+  appearance: none; display: block; width: 100%; text-align: left; position: relative;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 18px 16px; font-size: 1.25rem; font-weight: 800; line-height: 1.3;
+}
+button.ans { cursor: pointer; transition: transform .08s, box-shadow .08s; }
+button.ans:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+button.ans:disabled { cursor: not-allowed; }
+.ans.sel { background: var(--blue); color: #fff; }
+.ans.win { background: var(--pink); color: #fff; }
+.ans small { display: block; margin-top: 10px; font-size: .85rem; font-weight: 700; opacity: .9; }
+.ans .tally { float: right; font-size: 1.1rem; font-weight: 900; margin-left: 10px; }
+.badge { display: inline-block; margin: 16px 0 0; background: var(--blue); color: #fff; border: 3px solid var(--ink); border-radius: 10px; padding: 6px 12px; font-weight: 900; transform: rotate(-2deg); }
+.action { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 799px) {
+  .action:not(:empty) { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); z-index: 5; }
+  .action .btn { flex: 1; }
+}
+
+.overlay { position: fixed; inset: 0; background: rgba(21, 19, 15, .75); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--paper); border: 3px solid var(--ink); border-radius: var(--radius); padding: 24px; max-width: 380px; }
+.dialog h2 { margin: 0 0 8px; }
+.dialog p { color: var(--dim); margin: 0 0 18px; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: var(--paper); font-weight: 700; padding: 10px 18px; border-radius: 12px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- PeerJS: browser-to-browser connections, no server of your own needed -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+/* =====================================================
+   THE PROMPTS. Edit freely. Each line is one prompt:
+   ["English", "Thai"], with a comma after it.
+   Every player sees prompts in the language they chose.
+   ===================================================== */
+const PROMPTS = [
+  ["The worst thing to say during a job interview", "สิ่งที่แย่ที่สุดที่จะพูดตอนสัมภาษณ์งาน"],
+  ["A terrible name for a perfume", "ชื่อน้ำหอมที่แย่ที่สุด"],
+  ["What your pet really thinks of you", "สัตว์เลี้ยงของคุณคิดกับคุณยังไงจริง ๆ"],
+  ["The worst thing to whisper on a first date", "สิ่งที่ไม่ควรกระซิบในเดตแรก"],
+  ["A rejected ice cream flavour", "รสไอศกรีมที่ไม่ผ่านการอนุมัติ"],
+  ["The real reason you're still single", "เหตุผลจริง ๆ ที่คุณยังโสด"],
+  ["A bad slogan for a condom brand", "สโลแกนห่วย ๆ ของแบรนด์ถุงยาง"],
+  ["Something you'd find in a villain's search history", "สิ่งที่จะเจอในประวัติการค้นหาของตัวร้าย"],
+  ["The last thing you want to hear from your surgeon as you wake up", "ประโยคที่ไม่อยากได้ยินจากหมอผ่าตัดตอนเพิ่งฟื้น"],
+  ["A terrible theme for a wedding", "ธีมงานแต่งที่แย่ที่สุด"],
+  ["Something you should never say to your partner's mum", "สิ่งที่ไม่ควรพูดกับแม่แฟนเด็ดขาด"],
+  ["The title of your autobiography, if it were honest", "ชื่อหนังสืออัตชีวประวัติของคุณ ถ้าต้องพูดความจริง"],
+  ["A terrible name for a sex position", "ชื่อท่าบนเตียงที่ฟังแล้วหมดอารมณ์"],
+  ["What ghosts actually do all day", "จริง ๆ แล้วผีทำอะไรทั้งวัน"],
+  ["The worst superpower", "พลังวิเศษที่ห่วยที่สุด"],
+  ["A text you should never send to your boss", "ข้อความที่ไม่ควรส่งหาเจ้านาย"],
+  ["The worst thing to shout in a crowded lift", "สิ่งที่ไม่ควรตะโกนในลิฟต์คนแน่น"],
+  ["What you'd do with one day of being invisible", "ถ้าล่องหนได้หนึ่งวัน คุณจะทำอะไร"],
+  ["A bad excuse for being late to your own wedding", "ข้ออ้างห่วย ๆ ที่ไปงานแต่งตัวเองสาย"],
+  ["The worst thing to find in your hotel bed", "สิ่งที่ไม่อยากเจอบนเตียงโรงแรม"],
+  ["A new rule that would make the Olympics better", "กฎใหม่ที่จะทำให้โอลิมปิกสนุกขึ้น"],
+  ["The most useless thing to bring to a desert island", "ของที่ไร้ประโยชน์ที่สุดที่จะเอาไปติดเกาะ"],
+  ["What your ex says about you", "แฟนเก่าพูดถึงคุณว่าอะไร"],
+  ["A terrible first line for a love letter", "ประโยคเปิดจดหมายรักที่แย่ที่สุด"],
+  ["The worst thing to say at a funeral", "สิ่งที่ไม่ควรพูดในงานศพ"],
+  ["A red flag in a dating profile", "สัญญาณอันตรายในโปรไฟล์หาคู่"],
+  ["What aliens think when they watch us", "มนุษย์ต่างดาวคิดยังไงเวลาแอบดูพวกเรา"],
+  ["A job you'd be fired from within an hour", "งานที่คุณจะโดนไล่ออกภายในหนึ่งชั่วโมง"],
+  ["The worst thing to say right after a kiss", "สิ่งที่ไม่ควรพูดทันทีหลังจูบ"],
+  ["A name you should never give a baby", "ชื่อที่ไม่ควรตั้งให้ลูก"],
+  ["Something that would ruin a massage", "สิ่งที่ทำให้การนวดพังทันที"],
+  ["The worst thing to say in bed", "สิ่งที่ไม่ควรพูดบนเตียง"],
+  ["A secret your fridge would tell about you", "ความลับที่ตู้เย็นจะแฉเกี่ยวกับคุณ"],
+  ["The drunkest thing you could do at a wedding", "เรื่องเมาที่สุดที่ทำได้ในงานแต่ง"],
+  ["A terrible prize on a game show", "ของรางวัลเกมโชว์ที่ห่วยที่สุด"],
+  ["The worst possible safe word", "เซฟเวิร์ดที่แย่ที่สุด"],
+  ["What you'd name your yacht", "ถ้ามีเรือยอชต์ คุณจะตั้งชื่อว่าอะไร"],
+  ["A warning label that should exist", "ป้ายคำเตือนที่ควรมีจริง ๆ"],
+  ["The worst gift to give your crush", "ของขวัญที่ไม่ควรให้คนที่แอบชอบ"],
+  ["Something you shouldn't do naked", "สิ่งที่ไม่ควรทำตอนแก้ผ้า"],
+  ["The last thing you'd want to hear from a pilot", "ประโยคที่ไม่อยากได้ยินจากนักบิน"],
+  ["A terrible way to break up with someone", "วิธีบอกเลิกที่แย่ที่สุด"],
+  ["What your browser history says about you", "ประวัติการท่องเว็บบอกอะไรเกี่ยวกับคุณ"],
+  ["The worst tattoo to get on your face", "รอยสักที่ไม่ควรสักบนหน้า"],
+  ["A lie everyone tells on a first date", "เรื่องโกหกที่ทุกคนพูดในเดตแรก"],
+  ["The weirdest thing to be caught doing at 3 a.m.", "เรื่องแปลกที่สุดที่โดนจับได้ตอนตีสาม"],
+  ["A terrible thing to say to a police officer", "สิ่งที่ไม่ควรพูดกับตำรวจ"],
+  ["The worst idea for an app", "ไอเดียแอปที่ห่วยที่สุด"],
+  ["Something you'd regret shouting during karaoke", "สิ่งที่จะเสียใจถ้าตะโกนออกไปตอนร้องคาราโอเกะ"],
+  ["The name of a cocktail that ends friendships", "ชื่อค็อกเทลที่ทำให้เพื่อนเลิกคบกัน"],
+  ["What you'd most likely be arrested for", "ถ้าโดนจับ คุณน่าจะโดนข้อหาอะไร"],
+  ["The worst thing to hear from the next toilet cubicle", "เสียงที่ไม่อยากได้ยินจากห้องน้ำข้าง ๆ"],
+  ["A bad chat-up line that might still work", "มุกจีบห่วย ๆ ที่อาจได้ผล"],
+  ["An honest review of your love life", "รีวิวชีวิตรักของคุณแบบตรงไปตรงมา"],
+  ["What you'd put on a billboard outside your ex's house", "ถ้าได้ขึ้นป้ายบิลบอร์ดหน้าบ้านแฟนเก่า คุณจะเขียนว่าอะไร"],
+  ["A sport that should be played naked", "กีฬาที่ควรเล่นแบบแก้ผ้า"],
+  ["The most embarrassing way to end up in hospital", "วิธีเข้าโรงพยาบาลที่น่าอายที่สุด"],
+  ["What your phone would say if it could talk", "ถ้ามือถือพูดได้ มันจะพูดว่าอะไร"],
+  ["A terrible name for a strip club", "ชื่อบาร์อะโกโก้ที่แย่ที่สุด"],
+  ["The real reason the dinosaurs died out", "เหตุผลจริง ๆ ที่ไดโนเสาร์สูญพันธุ์"],
+  ["A feature the human body should have", "ฟีเจอร์ที่ร่างกายคนเราควรมี"],
+  ["The worst thing to say to someone on their birthday", "สิ่งที่ไม่ควรพูดกับเจ้าของวันเกิด"],
+  ["What the after-party in heaven is like", "ปาร์ตี้หลังเลิกงานบนสวรรค์เป็นยังไง"],
+  ["The worst thing to say when you meet your idol", "สิ่งที่ไม่ควรพูดตอนได้เจอไอดอลตัวจริง"],
+  ["A reason to call in sick that your boss would never question", "ข้ออ้างลาป่วยที่เจ้านายไม่กล้าถามต่อ"],
+  ["What you'd do first if you woke up rich", "ถ้าตื่นมาแล้วรวย คุณจะทำอะไรเป็นอย่างแรก"],
+  ["The worst topping to put on a pizza", "หน้าพิซซ่าที่แย่ที่สุด"],
+  ["A terrible thing to say to the person sitting next to you on a long flight", "สิ่งที่ไม่ควรพูดกับคนนั่งข้าง ๆ บนเครื่องบินไฟลต์ยาว"]
+];
+
+/* =====================================================
+   THE WORDS ON SCREEN, in each language.
+   {n}, {name} and so on are filled in by the game.
+   ===================================================== */
+const STR = {
+  en: {
+    langName: 'English',
+    tag: 'Two answers go in. The funnier one gets the votes.',
+    yourName: 'Your name', namePh: 'e.g. Sam',
+    create: 'Create a room', orJoin: 'or join with a code', join: 'Join', codePh: 'CODE',
+    how1: 'Get everyone on a call. Each round you get two prompts. Type the funniest answers you can.',
+    how2: 'There are no timers. The game moves on when everyone has handed in.',
+    how3: 'Each prompt was answered by two people. Both answers appear on everyone\'s screen, and the rest of you vote for the funnier one.',
+    how4: 'One point per vote, plus a bonus if you take every vote.',
+    fine: '{a} to {b} players',
+    creating: 'Creating room…', joining: 'Joining {code}…',
+    errName: 'Pick a name first.', errCode: 'Room codes are 5 letters.',
+    errNoRoom: 'No room with that code. Check it and try again.',
+    errFind: 'Could not find that room. Check the code and make sure the host still has the game open.',
+    errConn: 'Connection problem. Check your internet and try again.',
+    errFull: 'That room is full.',
+    errLib: 'The connection library did not load. Refresh the page.',
+    errServer: 'Could not reach the connection server. Check your internet and try again.',
+    roomCode: 'Room code', copy: 'Copy invite link', copied: 'Invite link copied.', copyPrompt: 'Copy this link:',
+    players: 'Players', host: 'host', you: 'you', rounds: 'Rounds', start: 'Start game',
+    needMore: v => 'Need ' + v.n + ' more player' + (v.n === 1 ? '' : 's'),
+    keepOpen: 'Keep this tab open. You are hosting, so the room closes if you leave.',
+    waitHost: v => 'Waiting for the host to start. ' + v.n + ' round' + (v.n === 1 ? '' : 's') + '.',
+    room: 'Room', roundOf: 'Round {a} of {b}',
+    writeStatus: 'Answer both prompts. Funny beats correct.',
+    promptN: 'Prompt {n} of 2', answerPh: 'Type your answer', submit: 'Hand them in',
+    handed: 'Handed in. Waiting on {n} more.', youWrote: 'You wrote:',
+    late: 'A round is already going. You\'ll be dealt in for the next one, and you can still vote.',
+    matchOf: 'Face-off {a} of {b}', prompt: 'The prompt',
+    pick: 'Tap the funnier answer.', yours: 'One of these is yours, so no vote for you this time.',
+    voted: 'Vote is in. Waiting on {n} more.', showNow: 'Show the votes now',
+    next: 'Next face-off', nextRound: 'Next round', final: 'See final scores',
+    votes: v => v.n + (v.n === 1 ? ' vote' : ' votes'),
+    sweep: 'Clean sweep! +1 bonus', draw: 'It\'s a draw.', wins: '{name} takes it.', noVoters: 'Nobody was left to vote on this one.',
+    yourAnswer: 'yours',
+    gameOver: 'Game over', winsGame: '{name} wins', tie: '{names} tie', and: 'and', everyone: 'Everyone ties',
+    again: 'Play again', backLobby: 'Back to lobby', waitAgain: 'Waiting for the host to start another game.',
+    lostTitle: 'Connection lost', lostBody: 'The link to the host dropped. If the host closed the game, the room is gone.',
+    reconnect: 'Try to reconnect', leave: 'Leave', reconnecting: 'Reconnecting…',
+    notEnough: 'Not enough players left. Back to the lobby.'
+  },
+  th: {
+    langName: 'ไทย',
+    tag: 'สองคำตอบชนกัน ใครฮากว่า คนนั้นได้โหวต',
+    yourName: 'ชื่อของคุณ', namePh: 'เช่น แซม',
+    create: 'สร้างห้อง', orJoin: 'หรือเข้าห้องด้วยรหัส', join: 'เข้าห้อง', codePh: 'รหัส',
+    how1: 'โทรหากันให้ครบก่อน แต่ละรอบทุกคนจะได้โจทย์ 2 ข้อ พิมพ์คำตอบให้ฮาที่สุด',
+    how2: 'ไม่มีจับเวลา พอทุกคนส่งครบ เกมจะไปต่อเอง',
+    how3: 'แต่ละโจทย์มีคนตอบสองคน คำตอบทั้งคู่จะขึ้นบนจอของทุกคน แล้วคนที่เหลือโหวตว่าอันไหนฮากว่า',
+    how4: 'ได้ 1 คะแนนต่อ 1 โหวต ถ้ากวาดทุกโหวตจะได้โบนัสเพิ่ม',
+    fine: 'ผู้เล่น {a} ถึง {b} คน',
+    creating: 'กำลังสร้างห้อง…', joining: 'กำลังเข้าห้อง {code}…',
+    errName: 'ใส่ชื่อก่อนนะ', errCode: 'รหัสห้องมี 5 ตัวอักษร',
+    errNoRoom: 'ไม่พบห้องที่ใช้รหัสนี้ ลองเช็กอีกครั้ง',
+    errFind: 'หาห้องไม่เจอ ลองเช็กรหัส และดูว่าโฮสต์ยังเปิดเกมอยู่ไหม',
+    errConn: 'เชื่อมต่อไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วลองใหม่',
+    errFull: 'ห้องเต็มแล้ว',
+    errLib: 'โหลดตัวเชื่อมต่อไม่สำเร็จ ลองรีเฟรชหน้านี้',
+    errServer: 'ติดต่อเซิร์ฟเวอร์เชื่อมต่อไม่ได้ ลองเช็กอินเทอร์เน็ตแล้วลองใหม่',
+    roomCode: 'รหัสห้อง', copy: 'คัดลอกลิงก์ชวนเพื่อน', copied: 'คัดลอกลิงก์แล้ว', copyPrompt: 'คัดลอกลิงก์นี้:',
+    players: 'ผู้เล่น', host: 'โฮสต์', you: 'คุณ', rounds: 'จำนวนรอบ', start: 'เริ่มเกม',
+    needMore: 'ต้องการผู้เล่นอีก {n} คน',
+    keepOpen: 'อย่าปิดแท็บนี้ คุณเป็นโฮสต์ ถ้าออก ห้องจะปิด',
+    waitHost: 'รอโฮสต์เริ่มเกม เล่นทั้งหมด {n} รอบ',
+    room: 'ห้อง', roundOf: 'รอบ {a}/{b}',
+    writeStatus: 'ตอบให้ครบทั้งสองข้อ เอาฮา ไม่ต้องเอาถูก',
+    promptN: 'โจทย์ {n} จาก 2', answerPh: 'พิมพ์คำตอบ', submit: 'ส่งคำตอบ',
+    handed: 'ส่งแล้ว รออีก {n} คน', youWrote: 'คุณตอบว่า:',
+    late: 'รอบนี้เริ่มไปแล้ว คุณจะได้เล่นในรอบถัดไป ระหว่างนี้ยังโหวตได้',
+    matchOf: 'คู่ที่ {a}/{b}', prompt: 'โจทย์',
+    pick: 'แตะคำตอบที่ฮากว่า', yours: 'คู่นี้มีคำตอบของคุณ เลยโหวตไม่ได้',
+    voted: 'โหวตแล้ว รออีก {n} คน', showNow: 'เปิดผลโหวตเลย',
+    next: 'คู่ต่อไป', nextRound: 'รอบต่อไป', final: 'ดูคะแนนรวม',
+    votes: '{n} โหวต',
+    sweep: 'กวาดเรียบ! โบนัส +1', draw: 'เสมอกัน', wins: '{name} ชนะคู่นี้', noVoters: 'คู่นี้ไม่มีคนเหลือให้โหวต',
+    yourAnswer: 'ของคุณ',
+    gameOver: 'จบเกม', winsGame: '{name} ชนะ', tie: '{names} เสมอกัน', and: 'และ', everyone: 'เสมอกันทุกคน',
+    again: 'เล่นอีกครั้ง', backLobby: 'กลับไปที่ล็อบบี้', waitAgain: 'รอโฮสต์เริ่มเกมใหม่',
+    lostTitle: 'การเชื่อมต่อหลุด', lostBody: 'การเชื่อมต่อกับโฮสต์หลุด ถ้าโฮสต์ปิดเกมไปแล้ว ห้องนี้จะหายไป',
+    reconnect: 'ลองเชื่อมต่อใหม่', leave: 'ออก', reconnecting: 'กำลังเชื่อมต่อใหม่…',
+    notEnough: 'ผู้เล่นเหลือไม่พอ กลับไปที่ล็อบบี้'
+  }
+};
+
+/* =====================================================
+   THE GAME. The player who creates the room is the host:
+   their browser holds the real game state and sends each
+   player only what they are allowed to see. Answers stay
+   anonymous until the votes are in.
+   ===================================================== */
+(() => {
+  'use strict';
+
+  const PREFIX = 'clapback-v1-';
+  const MAX_LEN = 100;
+  const MIN_PLAYERS = 3, MAX_PLAYERS = 10;
+  const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+  const $app = document.getElementById('app');
+  const $toast = document.getElementById('toast');
+
+  const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
+  const save = (store, k, v) => { try { window[store].setItem(k, v); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const makeCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
+  const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+  const cleanText = s => String(s || '').replace(/\s+/g, ' ').trim().slice(0, MAX_LEN);
+
+  // Language: each player picks their own. It changes the words on screen and which side of each prompt they see.
+  let lang = load('localStorage', 'cb_lang') || ((navigator.language || '').toLowerCase().startsWith('th') ? 'th' : 'en');
+  if (!STR[lang]) lang = 'en';
+  document.documentElement.lang = lang;
+  const T = (k, v) => {
+    const s = STR[lang][k] !== undefined ? STR[lang][k] : STR.en[k];
+    return typeof s === 'function' ? s(v || {}) : String(s).replace(/\{(\w+)\}/g, (m, x) => (v && x in v) ? v[x] : m);
+  };
+  const promptText = i => { const p = PROMPTS[i] || ['', '']; return (lang === 'th' && p[1]) ? p[1] : p[0]; };
+
+  let myPid = load('sessionStorage', 'cb_pid');
+  if (!myPid) { myPid = Math.random().toString(36).slice(2, 12); save('sessionStorage', 'cb_pid', myPid); }
+  let myName = load('localStorage', 'cb_name') || '';
+  let roomCode = cleanCode(new URLSearchParams(location.search).get('room'));
+
+  let peer = null, hostConn = null, isHost = false;
+  let G = null;        // full game state (host only)
+  let view = null;     // what this player is allowed to see
+  let busy = null, homeErr = '', lost = false, joinTimer = null;   // busy and homeErr hold keys into STR
+  let drafts = ['', ''], selKey = '';
+
+  /* ---------------- HOST ---------------- */
+  const P = pid => G.players.find(p => p.pid === pid);
+  const isLive = pid => { const p = P(pid); return !!(p && p.connected); };
+
+  function createRoom() {
+    isHost = true;
+    const code = makeCode();
+    busy = { k: 'creating' }; render();
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      busy = null; roomCode = code;
+      G = {
+        code, phase: 'lobby', rounds: 2, round: 0, hostPid: myPid,
+        players: [{ pid: myPid, name: myName, score: 0, conn: null, connected: true }],
+        roster: [], prompts: [], subs: {}, matches: [], m: 0, votes: {}, scored: false, sweep: null, deck: []
+      };
+      setRoomUrl(code);
+      sync();
+    });
+    peer.on('connection', conn => {
+      conn.on('data', msg => {
+        if (!G || !msg || typeof msg !== 'object') return;
+        if (msg.t === 'join') hostJoin(conn, msg);
+        else if (conn.pid) handle(conn.pid, msg);
+      });
+      conn.on('close', () => hostLeave(conn));
+      conn.on('error', () => hostLeave(conn));
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
+      else if (!G) { peer.destroy(); busy = null; homeErr = 'errServer'; render(); }
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function hostJoin(conn, msg) {
+    const pid = String(msg.pid || '').slice(0, 20);
+    const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
+    if (!pid) return;
+    let p = P(pid);
+    if (p) {                                   // same player coming back
+      if (p.pid === G.hostPid) return;
+      const old = p.conn;
+      p.conn = conn; p.connected = true; p.name = name;
+      if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    } else {
+      if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
+      G.players.push({ pid, name, score: 0, conn, connected: true });
+    }
+    conn.pid = pid;
+    sync();
+  }
+
+  function hostLeave(conn) {
+    if (!G || !conn.pid) return;
+    const p = P(conn.pid);
+    if (!p || p.conn !== conn) return;
+    p.conn = null; p.connected = false;
+    if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
+    if (G.phase === 'write') maybeVote();
+    else if (G.phase === 'vote') maybeScore();
+    sync();
+  }
+
+  function startGame() {
+    G.players = G.players.filter(p => p.connected);
+    G.players.forEach(p => { p.score = 0; });
+    G.deck = []; G.round = 0;
+    startRound();
+  }
+
+  // The writers sit in a ring. Prompt number j goes to the writer in seat j and to the writer in the seat before,
+  // so every writer answers two prompts and every prompt gets two answers.
+  function startRound() {
+    G.roster = shuffle(G.players.filter(p => p.connected).map(p => p.pid));
+    if (G.roster.length < MIN_PLAYERS) {
+      G.phase = 'lobby';
+      toastAll('notEnough');
+      sync(); return;
+    }
+    G.prompts = G.roster.map(() => {
+      if (!G.deck.length) G.deck = shuffle(PROMPTS.map((p, i) => i));
+      return G.deck.pop();
+    });
+    G.subs = {}; G.matches = []; G.round++;
+    G.phase = 'write';
+    sync();
+  }
+
+  const myPrompts = pid => {
+    const i = G.roster.indexOf(pid), n = G.roster.length;
+    return [G.prompts[i], G.prompts[(i + 1) % n]];
+  };
+
+  function maybeVote() {
+    if (G.phase !== 'write') return;
+    if (!G.roster.filter(isLive).every(pid => G.subs[pid])) return;
+    const n = G.roster.length, list = [];
+    G.roster.forEach((pid, j) => {
+      const other = G.roster[(j - 1 + n) % n];          // the writer who got this prompt as their second one
+      const a = G.subs[pid] && G.subs[pid][0], b = G.subs[other] && G.subs[other][1];
+      if (a && b) list.push({ prompt: G.prompts[j], sides: shuffle([{ pid, text: a }, { pid: other, text: b }]) });
+    });
+    G.matches = shuffle(list);
+    if (!G.matches.length) { endRound(); return; }
+    G.phase = 'vote'; G.m = 0; G.votes = {}; G.scored = false; G.sweep = null;
+    maybeScore();
+  }
+
+  const authors = () => G.matches[G.m].sides.map(s => s.pid);
+  const voters = () => G.players.filter(p => p.connected && !authors().includes(p.pid));
+
+  function maybeScore() {
+    if (G.phase !== 'vote' || G.scored) return;
+    const v = voters();
+    if (!v.length || v.every(p => G.votes[p.pid] !== undefined)) score();
+  }
+
+  function score() {                            // a point per vote, and a bonus point for taking every vote
+    const cast = Object.values(G.votes), counts = [0, 1].map(i => cast.filter(x => x === i).length);
+    G.sweep = null;
+    G.matches[G.m].sides.forEach((s, i) => {
+      const w = P(s.pid);
+      const all = cast.length >= 2 && counts[i] === cast.length;
+      if (all) G.sweep = i;
+      if (w) w.score += counts[i] + (all ? 1 : 0);
+    });
+    G.scored = true;
+  }
+
+  function endRound() {
+    if (G.round >= G.rounds) G.phase = 'gameover';
+    else { startRound(); return; }
+  }
+
+  // Every player action lands here (the host's own actions too).
+  function handle(pid, msg) {
+    const p = P(pid);
+    if (!p) return;
+    const amHost = pid === G.hostPid;
+    switch (msg.t) {
+      case 'rounds':
+        if (amHost && G.phase === 'lobby') { G.rounds = Math.min(5, Math.max(1, parseInt(msg.rounds, 10) || 2)); sync(); }
+        break;
+      case 'start':
+        if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
+            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+        break;
+      case 'write': {
+        const texts = Array.isArray(msg.texts) ? msg.texts.slice(0, 2).map(cleanText) : [];
+        if (G.phase !== 'write' || !G.roster.includes(pid) || G.subs[pid] || texts.length !== 2 || !texts[0] || !texts[1]) return;
+        G.subs[pid] = texts;
+        maybeVote();
+        sync();
+        break;
+      }
+      case 'vote':
+        if (G.phase !== 'vote' || G.scored || authors().includes(pid) || G.votes[pid] !== undefined || (msg.i !== 0 && msg.i !== 1)) return;
+        G.votes[pid] = msg.i;
+        maybeScore();
+        sync();
+        break;
+      case 'tally':                             // don't wait for stragglers
+        if (G.phase === 'vote' && !G.scored && (amHost || authors().includes(pid))) { score(); sync(); }
+        break;
+      case 'next':
+        if (G.phase !== 'vote' || !G.scored || !(amHost || authors().includes(pid))) return;
+        if (G.m + 1 < G.matches.length) { G.m++; G.votes = {}; G.scored = false; G.sweep = null; maybeScore(); }
+        else { endRound(); if (G.phase === 'write') return; }
+        sync();
+        break;
+      case 'lobby':
+        if (amHost && G.phase === 'gameover') {
+          G.players = G.players.filter(x => x.connected);
+          G.players.forEach(x => { x.score = 0; });
+          G.phase = 'lobby'; sync();
+        }
+        break;
+    }
+  }
+
+  function viewFor(pid) {
+    const ph = G.phase;
+    const v = {
+      code: G.code, phase: ph, rounds: G.rounds, round: G.round, you: pid, hostPid: G.hostPid,
+      players: G.players.map(p => ({
+        pid: p.pid, name: p.name, score: p.score, connected: p.connected,
+        done: ph === 'write' ? !!G.subs[p.pid] : (ph === 'vote' && !G.scored) ? G.votes[p.pid] !== undefined : false
+      }))
+    };
+    if (ph === 'write') {
+      const writing = G.roster.includes(pid);
+      v.write = {
+        writing, prompts: writing ? myPrompts(pid) : [], mine: G.subs[pid] || null,
+        waiting: G.roster.filter(x => isLive(x) && !G.subs[x]).length
+      };
+    }
+    if (ph === 'vote') {
+      const mt = G.matches[G.m], cast = G.votes;
+      v.vote = {
+        index: G.m, count: G.matches.length, prompt: mt.prompt, scored: G.scored, sweep: G.scored ? G.sweep : null,
+        author: authors().includes(pid), myVote: cast[pid] === undefined ? null : cast[pid],
+        waiting: voters().filter(p => cast[p.pid] === undefined).length, voterCount: voters().length,
+        last: G.m + 1 >= G.matches.length, finalRound: G.round >= G.rounds,
+        sides: mt.sides.map((s, i) => ({
+          text: s.text, own: s.pid === pid,
+          pid: G.scored ? s.pid : null,                                   // writers stay secret until the votes are in
+          voters: G.scored ? Object.keys(cast).filter(k => cast[k] === i) : []
+        }))
+      };
+    }
+    return v;
+  }
+
+  function sync() {
+    G.players.forEach(p => {
+      if (p.conn && p.conn.open) { try { p.conn.send({ t: 'state', v: viewFor(p.pid) }); } catch (e) {} }
+    });
+    view = viewFor(myPid);
+    render();
+  }
+
+  // Messages are sent as keys, so each player reads them in their own language.
+  function toastAll(k) {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', k }); } catch (e) {} } });
+    toast(T(k));
+  }
+
+  /* ---------------- GUEST ---------------- */
+  function joinRoom(code) {
+    isHost = false; roomCode = code;
+    busy = { k: 'joining', v: { code } }; render();
+    peer = new Peer();
+    joinTimer = setTimeout(() => joinFail('errFind'), 15000);
+    peer.on('open', () => connectHost());
+    peer.on('error', err => {
+      if (err.type === 'peer-unavailable') {
+        if (view) { lost = true; render(true); }
+        else joinFail('errNoRoom');
+      } else if (!view) joinFail('errConn');
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function connectHost() {
+    const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+    hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('data', msg => {
+      if (!msg || conn !== hostConn) return;
+      if (msg.t === 'state') {
+        clearTimeout(joinTimer); busy = null; const was = lost; lost = false;
+        if (!view) setRoomUrl(roomCode);
+        view = msg.v; render(was);
+      } else if (msg.t === 'toast') toast(T(msg.k));
+      else if (msg.t === 'full') joinFail('errFull');
+    });
+    conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(true); } });
+  }
+
+  function joinFail(k) {
+    clearTimeout(joinTimer);
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = null; hostConn = null; view = null; busy = null; homeErr = k;
+    render();
+  }
+
+  function act(msg) {
+    if (isHost) handle(myPid, msg);
+    else if (hostConn && hostConn.open) hostConn.send(msg);
+  }
+
+  /* ---------------- RENDERING ---------------- */
+  function setRoomUrl(code) {
+    try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  }
+  const shareUrl = () => location.origin + location.pathname + '?room=' + view.code;
+
+  let toastTimer = null;
+  function toast(text) {
+    $toast.textContent = text; $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
+  }
+
+  // force = redraw even while someone is typing (language switch, lost connection)
+  function render(force) {
+    if (!view) { $app.innerHTML = homeHTML(); return; }
+    const w = view.write, vt = view.vote;
+    const key = view.round + ':' + view.phase + ':' + (vt ? vt.index + ':' + vt.scored : '');
+    const same = key === selKey;
+    if (!same) { selKey = key; drafts = ['', '']; }
+    // Someone else handing in must not wipe what a player is typing:
+    // while I am still writing, only the score strip is refreshed.
+    if (same && !force && w && w.writing && w.mine === null && document.getElementById('a0')) {
+      const s = $app.querySelector('.scores');
+      if (s) s.outerHTML = scoresHTML();
+      return;
+    }
+    const a = document.activeElement, id = a && a.id, pos = a && a.selectionStart;
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    html += '<button class="btn small lang" data-act="lang">' + (lang === 'th' ? 'English' : 'ไทย') + '</button>';
+    if (lost) {
+      html += '<div class="overlay"><div class="dialog"><h2>' + T('lostTitle') + '</h2><p>' + T('lostBody') + '</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">' + T('reconnect') + '</button>' +
+        '<button class="btn" data-act="leave">' + T('leave') + '</button></div></div></div>';
+    }
+    $app.innerHTML = html;
+    const back = id && document.getElementById(id);
+    if (back) { back.focus(); try { back.setSelectionRange(pos, pos); } catch (e) {} }
+    else if (!same && document.getElementById('a0')) document.getElementById('a0').focus();
+  }
+
+  function homeHTML() {
+    const dis = busy ? ' disabled' : '';
+    return '<main class="home">' +
+      '<div class="seg">' + ['en', 'th'].map(l =>
+        '<button class="btn small' + (lang === l ? ' sel' : '') + '" data-act="setlang" data-l="' + l + '">' + STR[l].langName + '</button>').join('') + '</div>' +
+      '<h1 class="logo">Clap<br>Back<i>!</i></h1>' +
+      '<p class="tag">' + T('tag') + '</p>' +
+      '<label class="field"><span>' + T('yourName') + '</span>' +
+      '<input id="name" maxlength="16" autocomplete="off" placeholder="' + T('namePh') + '" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>' + T('create') + '</button>' +
+      '<div class="or"><span>' + T('orJoin') + '</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="' + T('codePh') + '" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>' + T('join') + '</button></div>' +
+      (busy ? '<p class="note">' + T(busy.k, busy.v) + '</p>' : '') +
+      (homeErr ? '<p class="err">' + T(homeErr) + '</p>' : '') +
+      '<ol class="how"><li>' + T('how1') + '</li><li>' + T('how2') + '</li><li>' + T('how3') + '</li><li>' + T('how4') + '</li></ol>' +
+      '<p class="fine">' + T('fine', { a: MIN_PLAYERS, b: MAX_PLAYERS }) + '</p>' +
+      '</main>';
+  }
+
+  function lobbyHTML() {
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const rounds = [1, 2, 3, 4, 5].map(g => '<option value="' + g + '"' + (g === v.rounds ? ' selected' : '') + '>' + g + '</option>').join('');
+    return '<main class="lobby">' +
+      '<p class="eyebrow">' + T('roomCode') + '</p>' +
+      '<div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">' + T('copy') + '</button>' +
+      '<h2>' + T('players') + ' <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p =>
+        '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>' + T('host') + '</em>' : '') + (p.pid === v.you ? ' <em>' + T('you') + '</em>' : '') + '</li>').join('') + '</ul>' +
+      (amHost
+        ? '<label class="field inline"><span>' + T('rounds') + '</span><select id="rounds">' + rounds + '</select></label>' +
+          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
+          (n < MIN_PLAYERS ? T('needMore', { n: MIN_PLAYERS - n }) : T('start')) + '</button>' +
+          '<p class="fine">' + T('keepOpen') + '</p>'
+        : '<p class="note">' + T('waitHost', { n: v.rounds }) + '</p>') +
+      '</main>';
+  }
+
+  function scoresHTML() {
+    const v = view;
+    return '<ul class="scores">' + v.players.map(p =>
+      '<li class="' + (p.connected ? '' : 'off ') + (p.pid === v.you ? 'me' : '') + '">' +
+      '<span class="nm">' + esc(p.name) + '</span>' + (p.done ? '<span class="mk">✓</span>' : '') +
+      '<b>' + p.score + '</b></li>').join('') + '</ul>';
+  }
+
+  function gameHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const name = pid => { const p = v.players.find(x => x.pid === pid); return p ? p.name : '?'; };
+    let body = '', action = '', where = '';
+
+    if (v.phase === 'write') {
+      const w = v.write;
+      if (!w.writing) {
+        body = '<p class="status">' + T('late') + '</p>';
+      } else if (w.mine) {
+        body = '<p class="status">' + T('handed', { n: w.waiting }) + '</p>' +
+          w.prompts.map((pi, i) => '<div class="q"><p>' + T('promptN', { n: i + 1 }) + '</p><h2>' + esc(promptText(pi)) + '</h2>' +
+            '<p class="mine">' + T('youWrote') + ' <b>' + esc(w.mine[i]) + '</b></p></div>').join('');
+      } else {
+        body = '<p class="status">' + T('writeStatus') + '</p>' +
+          w.prompts.map((pi, i) => '<div class="q"><p>' + T('promptN', { n: i + 1 }) + '</p><h2>' + esc(promptText(pi)) + '</h2>' +
+            '<input id="a' + i + '" maxlength="' + MAX_LEN + '" autocomplete="off" placeholder="' + T('answerPh') + '" value="' + esc(drafts[i]) + '"></div>').join('');
+        action = '<button class="btn primary big" data-act="write"' + (drafts[0].trim() && drafts[1].trim() ? '' : ' disabled') + '>' + T('submit') + '</button>';
+      }
+    } else {
+      const m = v.vote;
+      where = T('matchOf', { a: m.index + 1, b: m.count });
+      const canPick = !m.scored && !m.author && m.myVote === null;
+      const counts = m.sides.map(s => s.voters.length);
+      const lead = m.scored ? (counts[0] === counts[1] ? -1 : (counts[0] > counts[1] ? 0 : 1)) : -1;
+      const status = m.scored
+        ? (!m.voterCount && !counts[0] && !counts[1] ? T('noVoters') : lead < 0 ? T('draw') : T('wins', { name: esc(name(m.sides[lead].pid)) }))
+        : m.author ? T('yours') : canPick ? T('pick') : T('voted', { n: m.waiting });
+      body = '<div class="q"><p>' + T('prompt') + '</p><h2>' + esc(promptText(m.prompt)) + '</h2></div>' +
+        '<p class="status">' + status + '</p>' +
+        '<div class="vs">' + m.sides.map((s, i) => {
+          if (m.scored) {
+            return '<div class="ans' + (lead === i ? ' win' : '') + '"><span class="tally">' + T('votes', { n: counts[i] }) + '</span>' + esc(s.text) +
+              '<small>' + esc(name(s.pid)) + (s.voters.length ? ' · ♥ ' + s.voters.map(x => esc(name(x))).join(', ') : '') + '</small></div>';
+          }
+          return '<button class="ans' + (m.myVote === i ? ' sel' : '') + '" data-act="vote" data-i="' + i + '"' + (canPick ? '' : ' disabled') + '>' +
+            esc(s.text) + (s.own ? '<small>' + T('yourAnswer') + '</small>' : '') + '</button>';
+        }).join('') + '</div>' +
+        (m.scored && m.sweep !== null ? '<div class="badge">' + T('sweep') + '</div>' : '');
+      if (amHost || m.author) {
+        action = m.scored
+          ? '<button class="btn primary big" data-act="next">' + (!m.last ? T('next') : m.finalRound ? T('final') : T('nextRound')) + '</button>'
+          : '<button class="btn" data-act="tally">' + T('showNow') + '</button>';
+      }
+    }
+
+    return '<header class="bar"><span>' + T('room') + ' <b>' + esc(v.code) + '</b></span><span>' + T('roundOf', { a: v.round, b: v.rounds }) + '</span>' +
+      (where ? '<span>' + where + '</span>' : '') + '</header>' +
+      scoresHTML() +
+      '<main class="stage">' + body + '<div class="action">' + action + '</div></main>';
+  }
+
+  function overHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    // Everyone on the top score shares the win, and equal scores share a place.
+    const winners = ranked.filter(p => p.score === ranked[0].score).map(p => esc(p.name));
+    const headline = winners.length === 1 ? T('winsGame', { name: winners[0] })
+      : (winners.length === ranked.length && ranked.length > 2) ? T('everyone')
+      : T('tie', { names: winners.slice(0, -1).join(', ') + ' ' + T('and') + ' ' + winners[winners.length - 1] });
+    const place = p => ranked.findIndex(x => x.score === p.score) + 1;
+    return '<main class="lobby">' +
+      '<p class="eyebrow">' + T('gameOver') + '</p>' +
+      '<div class="code small">' + headline + '</div>' +
+      '<ul class="plist rank">' + ranked.map(p =>
+        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      (amHost
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>' + T('again') + '</button>' +
+          '<button class="btn" data-act="lobby">' + T('backLobby') + '</button>'
+        : '<p class="note">' + T('waitAgain') + '</p>') +
+      '</main>';
+  }
+
+  /* ---------------- EVENTS ---------------- */
+  function readName() {
+    myName = myName.trim().slice(0, 16);
+    if (!myName) { homeErr = 'errName'; render(); return false; }
+    save('localStorage', 'cb_name', myName);
+    homeErr = '';
+    return true;
+  }
+
+  function setLang(l) {
+    lang = STR[l] ? l : 'en';
+    save('localStorage', 'cb_lang', lang);
+    document.documentElement.lang = lang;
+    render(true);
+  }
+
+  $app.addEventListener('input', e => {
+    if (e.target.id === 'name') myName = e.target.value;
+    if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+    if (e.target.id === 'a0' || e.target.id === 'a1') {
+      drafts[+e.target.id[1]] = e.target.value;
+      const b = $app.querySelector('[data-act=write]');
+      if (b) b.disabled = !(drafts[0].trim() && drafts[1].trim());
+    }
+  });
+  $app.addEventListener('change', e => {
+    if (e.target.id === 'rounds') act({ t: 'rounds', rounds: e.target.value });
+  });
+  $app.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    if (e.target.id === 'code') go('join');
+    if (e.target.id === 'a0') { const n = document.getElementById('a1'); if (n) n.focus(); }
+    if (e.target.id === 'a1') go('write');
+  });
+  $app.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el && !el.disabled) go(el.dataset.act, el);
+  });
+
+  function go(a, el) {
+    switch (a) {
+      case 'setlang': setLang(el.dataset.l); break;
+      case 'lang': setLang(lang === 'th' ? 'en' : 'th'); break;
+      case 'create':
+        if (typeof Peer === 'undefined') { homeErr = 'errLib'; render(); return; }
+        if (readName()) createRoom();
+        break;
+      case 'join':
+        if (typeof Peer === 'undefined') { homeErr = 'errLib'; render(); return; }
+        if (!readName()) return;
+        if (roomCode.length !== 5) { homeErr = 'errCode'; render(); return; }
+        joinRoom(roomCode);
+        break;
+      case 'copy': {
+        const url = shareUrl();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast(T('copied')), () => prompt(T('copyPrompt'), url));
+        else prompt(T('copyPrompt'), url);
+        break;
+      }
+      case 'start': act({ t: 'start' }); break;
+      case 'lobby': act({ t: 'lobby' }); break;
+      case 'write': if (drafts[0].trim() && drafts[1].trim()) act({ t: 'write', texts: drafts }); break;
+      case 'vote': act({ t: 'vote', i: parseInt(el.dataset.i, 10) }); break;
+      case 'tally': act({ t: 'tally' }); break;
+      case 'next': act({ t: 'next' }); break;
+      case 'reconnect':
+        toast(T('reconnecting'));
+        if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+        if (peer && !peer.destroyed) connectHost();
+        break;
+      case 'leave': location.href = location.pathname; break;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
