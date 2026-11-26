@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Game night</title>
+<style>
+:root { --bg: #f6f3ed; --panel: #ece7de; --field: #fcfbf8; --line: #d8d1c4; --ink: #23211e; --dim: #7a7368; --radius: 18px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); min-height: 100vh;
+  font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", Thonburi, Tahoma, sans-serif;
+  font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased;
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+[hidden] { display: none !important; }
+
+/* ---------- the door ---------- */
+.door { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.door .in { width: 100%; max-width: 340px; text-align: center; }
+.door .mark { display: flex; justify-content: center; gap: 8px; margin-bottom: 26px; }
+.door .mark i { width: 14px; height: 14px; border-radius: 50%; }
+.door h1 { margin: 0 0 6px; font-size: 2.4rem; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.door p { margin: 0 0 18px; color: var(--dim); }
+.door .err { min-height: 1.4em; margin: 10px 0 0; color: #b4532f; font-weight: 700; }
+.door pre { text-align: left; padding: 14px 16px; background: var(--ink); color: var(--bg); border-radius: 12px; white-space: pre-wrap; word-break: break-all; font-size: .8rem; }
+.pad { display: block; width: min(100%, 300px); margin: 0 auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; border-radius: 28px; background: var(--panel); }
+.pad .ring { fill: transparent; stroke: transparent; stroke-width: 3; transition: stroke .12s, fill .12s; }
+.pad .pip { fill: var(--line); transition: fill .12s, r .12s; }
+.pad .dot.on .pip { fill: var(--ink); r: 11px; }
+.pad .dot.on .ring { stroke: var(--ink); fill: rgba(35, 33, 30, .06); }
+.pad .trail, .pad .lead { fill: none; stroke: var(--ink); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.pad .lead { opacity: .35; }
+.pad.bad .trail { stroke: #b4532f; } .pad.bad .dot.on .pip { fill: #b4532f; } .pad.bad .dot.on .ring { stroke: #b4532f; fill: rgba(180, 83, 47, .08); }
+.pad.wait .trail { opacity: .6; }
+#lock { margin: 0 auto; }
+#lock.open { opacity: .5; transition: opacity .2s; }
+.other { margin-top: 18px; background: none; border: 0; padding: 0; color: var(--dim); font-size: .88rem; text-decoration: underline; cursor: pointer; }
+.pull { display: block; width: 100%; margin-top: 16px; padding: 14px 18px; border: 0; border-radius: 999px; cursor: pointer; background: var(--ink); color: var(--bg); font-weight: 800; font-size: 1.05rem; }
+.tape { min-height: 18px; margin-top: 16px; display: flex; justify-content: center; align-items: center; gap: 6px; }
+.tape b { display: block; height: 8px; border-radius: 4px; background: var(--ink); }
+.tape .dit { width: 8px; } .tape .dah { width: 26px; }
+.bell .press { margin: 0 auto; width: 150px; height: 150px; border-radius: 50%; border: 0; cursor: pointer; background: var(--panel); box-shadow: inset 0 0 0 10px var(--line); display: grid; place-items: center; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.bell .press i { width: 64px; height: 64px; border-radius: 50%; background: #c08a2b; box-shadow: 0 5px 0 #77561b; transition: transform .06s, box-shadow .06s; }
+.bell .press.down i { transform: translateY(4px); box-shadow: 0 1px 0 #77561b; }
+.piano { display: flex; gap: 4px; height: 150px; padding: 8px; background: var(--ink); border-radius: 14px; }
+.piano button { flex: 1; border: 0; border-radius: 0 0 7px 7px; background: var(--field); cursor: pointer; transition: background .1s, transform .06s; touch-action: manipulation; }
+.piano button.hit { background: #c08a2b; transform: translateY(3px); }
+.fuses { display: flex; justify-content: center; gap: 10px; padding: 18px 12px; background: var(--panel); border-radius: 18px; }
+.sw { width: 38px; height: 84px; padding: 5px; border: 0; border-radius: 12px; background: var(--line); cursor: pointer; display: flex; align-items: flex-end; transition: background .15s; }
+.sw i { display: block; width: 28px; height: 36px; border-radius: 8px; background: var(--field); box-shadow: 0 2px 0 rgba(35, 33, 30, .2); transition: transform .15s; }
+.sw[aria-checked=true] { background: #2f9b65; }
+.sw[aria-checked=true] i { transform: translateY(-38px); }
+.clock { display: block; width: 200px; margin: 0 auto; }
+.clock > circle:first-child { fill: var(--field); stroke: var(--ink); stroke-width: 5; }
+.clock .ticks line { stroke: var(--dim); stroke-width: 3; stroke-linecap: round; }
+.clock .hh, .clock .mh { stroke: var(--ink); stroke-linecap: round; transition: transform .2s; }
+.clock .hh { stroke-width: 8; } .clock .mh { stroke-width: 5; }
+.clock .hub { fill: #b4532f; }
+.set { display: flex; gap: 8px; margin-top: 16px; }
+.set button { flex: 1; padding: 11px; border: 2px solid var(--line); border-radius: 999px; background: var(--field); font-weight: 700; cursor: pointer; }
+.kinds { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 18px; }
+.kinds button { padding: 6px 14px; border: 2px solid var(--line); border-radius: 999px; background: var(--field); font-weight: 700; cursor: pointer; text-transform: capitalize; }
+.kinds button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pad.good .trail { stroke: #2f9b65; } .pad.good .dot.on .pip { fill: #2f9b65; } .pad.good .dot.on .ring { stroke: #2f9b65; fill: rgba(47, 155, 101, .08); }
+.shake { animation: shake .35s; }
+@keyframes shake { 25% { transform: translateX(-7px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+
+/* ---------- the shelf ---------- */
+.shelf { max-width: 1040px; margin: 0 auto; padding: 56px 20px 40px; }
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 34px; }
+.top h1 { margin: 0; font-size: clamp(2.8rem, 9vw, 5rem); font-weight: 900; letter-spacing: -.045em; line-height: .92; }
+.top h1 span { display: block; color: var(--dim); }
+.top p { margin: 0 0 6px; max-width: 30ch; color: var(--dim); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.card {
+  position: relative; display: flex; flex-direction: column; min-height: 210px; padding: 20px 20px 18px;
+  background: var(--tint); border-radius: var(--radius); color: var(--ink); text-decoration: none; overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -18px rgba(35, 33, 30, .55); }
+.card .blob { position: absolute; right: -34px; top: -34px; width: 130px; height: 130px; border-radius: 50%; background: var(--hue); opacity: .9; transition: transform .25s ease; }
+.card:hover .blob { transform: scale(1.12); }
+.card .no { position: relative; font-size: .78rem; font-weight: 800; letter-spacing: .14em; color: var(--deep); }
+.card h2 { position: relative; margin: auto 0 6px; font-size: 1.9rem; font-weight: 900; letter-spacing: -.03em; line-height: 1; max-width: 9ch; }
+.card p { position: relative; margin: 0 0 14px; color: var(--deep); font-size: .95rem; max-width: 30ch; }
+.tags { position: relative; display: flex; gap: 6px; flex-wrap: wrap; }
+.tags span { padding: 3px 10px; border-radius: 999px; background: rgba(252, 251, 248, .7); font-size: .78rem; font-weight: 700; }
+.card .go { position: absolute; right: 18px; bottom: 16px; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-weight: 900; transition: transform .15s ease; }
+.card:hover .go { transform: translateX(4px); }
+.foot { margin-top: 30px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--dim); font-size: .88rem; }
+.foot button { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =====================================================
+   THE LOCKS
+   Each visit, the door shows one of these five at random.
+   The secrets are not written here, only their fingerprints.
+   To change one: open this page with #newlocks on the end
+   of the address (…/index.html#newlocks), pick the lock,
+   do the new secret, and paste the line it gives you over
+   the matching line below. To retire a lock, delete its line.
+   ===================================================== */
+const LOCKS = {
+  pattern: '36ad23232954ab71a524fa17b0af882ae11599502d863a80ac56b7d230da1ccd',
+  bell: 'e72057d8c19a09b1c51db1f922d6304a8e92d55ea2c69cd034dacd22c18a7de7',
+  piano: '2f397763197d80369f4ed73f6f8a41a271f70a9b4c1ba18630362bb7e20a361f',
+  switches: '7d350d7393b7f754483e18024585138b65cd1de1bbb3da588dc8c0de9459620d',
+  clock: 'bf5f890994caea27d2c66f7f38d1942e24cb75b5fa4b8159554f41ada667b2dc',
+};
+
+/* =====================================================
+   THE GAMES
+   One line per game. To add one, copy a line and change it.
+   file: the page to open     hue / tint / deep: its colours
+   ===================================================== */
+const GAMES = [
+  { file: 'bigfatlie.html',   name: 'Big Fat Lie',  line: 'Invent a fake answer. Spot the real one. Or just quiz yourself.', tags: ['solo or friends', 'EN / ไทย'], hue: '#2c6e68', tint: '#dbe7e2', deep: '#1f4f4b' },
+  { file: 'baddeck.html',     name: 'Bad Deck',     line: 'Fill in the blank with the worst card in your hand.',            tags: ['3+ players'],                 hue: '#23211e', tint: '#e4dfd6', deep: '#4a453e' },
+  { file: 'dealbreaker.html', name: 'Deal Breaker', line: 'Build a dream date. Then ruin everyone else\'s.',                tags: ['3+ players'],                 hue: '#b4532f', tint: '#f1ddd2', deep: '#7c3a21' },
+  { file: 'clapback.html',    name: 'Clap Back',    line: 'Two answers go head to head. The funnier one lives.',            tags: ['3+ players', 'EN / ไทย'],     hue: '#c08a2b', tint: '#f3e6c9', deep: '#77561b' },
+  { file: 'tunedin.html',     name: 'Tuned In',     line: 'One clue, one hidden spot on the scale. How well do you know each other?', tags: ['2+ players'],         hue: '#5b6fa8', tint: '#dde2f0', deep: '#3a4770' },
+  { file: 'outoften.html',    name: 'Out of Ten',   line: 'Everyone can see your number except you. Work it out from the hints.',     tags: ['3+ players'],         hue: '#a8577e', tint: '#f0dce6', deep: '#6f3852' },
+  { file: 'likelystory.html', name: 'Likely Story', line: 'You are all suspects. Get your alibi straight.',                 tags: ['3+ players'],                 hue: '#5f8a4e', tint: '#dfe9d8', deep: '#3d5a32' }
+];
+
+(() => {
+  'use strict';
+  const $app = document.getElementById('app');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const load = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const save = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
+
+  // SHA-256, written out so the page needs nothing else and works anywhere.
+  function sha256(text) {
+    const K = [], H = [], frac = x => ((x - Math.floor(x)) * 4294967296) | 0;
+    for (let n = 2, i = 0; i < 64; n++) {
+      let prime = true;
+      for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+      if (prime) { if (i < 8) H[i] = frac(Math.sqrt(n)); K[i++] = frac(Math.cbrt(n)); }
+    }
+    const bytes = Array.from(new TextEncoder().encode(text)), bits = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    for (let i = 7; i >= 0; i--) bytes.push(i > 3 ? 0 : (bits >>> (i * 8)) & 255);
+    const rot = (x, n) => (x >>> n) | (x << (32 - n)), w = [];
+    for (let o = 0; o < bytes.length; o += 64) {
+      for (let i = 0; i < 16; i++) w[i] = (bytes[o + i * 4] << 24) | (bytes[o + i * 4 + 1] << 16) | (bytes[o + i * 4 + 2] << 8) | bytes[o + i * 4 + 3];
+      for (let i = 16; i < 64; i++) {
+        const a = w[i - 15], b = w[i - 2];
+        w[i] = (w[i - 16] + (rot(a, 7) ^ rot(a, 18) ^ (a >>> 3)) + w[i - 7] + (rot(b, 17) ^ rot(b, 19) ^ (b >>> 10))) | 0;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (h + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+        const t2 = ((rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      [a, b, c, d, e, f, g, h].forEach((v, i) => { H[i] = (H[i] + v) | 0; });
+    }
+    return H.map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+  // Capitals and stray spaces do not matter, so it is easy to type on a phone.
+  const fingerprint = pw => sha256('game-night:' + String(pw).trim().toLowerCase());
+  window.fingerprint = fingerprint;
+
+
+  /* The pattern pad: nine dots, joined by dragging a finger (or the mouse) across them.
+     Like a phone lock screen, a line that jumps over a dot picks that dot up on the way.
+     Keyboard: the keys 1 to 9 are the dots, Enter finishes, Backspace starts again. */
+  function pad(el, onDone, onStart) {
+    const at = i => [50 + 100 * (i % 3), 50 + 100 * Math.floor(i / 3)];
+    el.innerHTML = '<svg class="pad" viewBox="0 0 300 300" tabindex="0" role="application" aria-label="Pattern lock. Drag across the dots, or use the keys 1 to 9 and press Enter.">' +
+      '<polyline class="trail" points=""/><line class="lead" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>' +
+      Array.from({ length: 9 }, (x, i) => '<g class="dot" data-i="' + i + '"><circle class="ring" cx="' + at(i)[0] + '" cy="' + at(i)[1] + '" r="26"/><circle class="pip" cx="' + at(i)[0] + '" cy="' + at(i)[1] + '" r="8"/></g>').join('') + '</svg>';
+    const svg = el.firstChild, trail = svg.querySelector('.trail'), lead = svg.querySelector('.lead'), dots = [...svg.querySelectorAll('.dot')];
+    let seq = [], drawing = false, timer = null;
+    const paint = () => {
+      trail.setAttribute('points', seq.map(i => at(i).join(',')).join(' '));
+      dots.forEach((d, i) => d.classList.toggle('on', seq.includes(i)));
+    };
+    const reset = () => { clearTimeout(timer); seq = []; svg.classList.remove('bad', 'good'); lead.setAttribute('visibility', 'hidden'); paint(); };
+    const add = i => {
+      if (seq.includes(i)) return;
+      if (seq.length) {                                   // straight over a dot: take it too
+        const a = seq[seq.length - 1], r = Math.floor(a / 3) + Math.floor(i / 3), c = a % 3 + i % 3;
+        if (r % 2 === 0 && c % 2 === 0) { const m = (r / 2) * 3 + c / 2; if (!seq.includes(m)) seq.push(m); }
+      }
+      seq.push(i); paint();
+    };
+    const where = e => { const b = svg.getBoundingClientRect(); return [(e.clientX - b.left) * 300 / b.width, (e.clientY - b.top) * 300 / b.height]; };
+    const touch = e => {
+      const [x, y] = where(e);
+      for (let i = 0; i < 9; i++) if (Math.hypot(x - at(i)[0], y - at(i)[1]) < 34) add(i);
+      if (seq.length) { const p = at(seq[seq.length - 1]); lead.setAttribute('x1', p[0]); lead.setAttribute('y1', p[1]); lead.setAttribute('x2', x); lead.setAttribute('y2', y); lead.setAttribute('visibility', 'visible'); }
+    };
+    const finish = () => { drawing = false; lead.setAttribute('visibility', 'hidden'); if (seq.length) onDone(seq.length < 4 ? null : seq.join('-')); };
+    svg.addEventListener('pointerdown', e => { e.preventDefault(); reset(); if (onStart) onStart(); drawing = true; try { svg.setPointerCapture(e.pointerId); } catch (x) {} touch(e); });
+    svg.addEventListener('pointermove', e => { if (drawing) touch(e); });
+    svg.addEventListener('pointerup', () => { if (drawing) finish(); });
+    svg.addEventListener('pointercancel', () => { drawing = false; reset(); });
+    svg.addEventListener('keydown', e => {
+      if (/^[1-9]$/.test(e.key)) { if (svg.classList.contains('bad')) reset(); add(+e.key - 1); }
+      else if (e.key === 'Enter') finish();
+      else if (e.key === 'Backspace' || e.key === 'Escape') reset();
+    });
+    return {
+      reset,
+      show(cls, ms) { svg.classList.add(cls); clearTimeout(timer); if (ms) timer = setTimeout(reset, ms); },
+      shake() { svg.classList.remove('shake'); void svg.getBoundingClientRect(); svg.classList.add('shake'); }
+    };
+  }
+  const fingerprintOf = (kind, value) => fingerprint(kind + ':' + value);
+  const KINDS = Object.keys(LOCKS);
+  const ALL_KEY = fingerprint(KINDS.map(k => LOCKS[k]).join('|'));       // change any lock and everyone is locked out again
+  const unlocked = () => load('gn_key') === ALL_KEY;
+
+  // A short beep, for the bell and the piano. Silent if the browser will not allow sound.
+  let audio = null;
+  function tone(freq, ms) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+      o.type = 'triangle'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + ms / 1000);
+      o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + ms / 1000);
+    } catch (e) {}
+  }
+
+  /* ---------------- THE FIVE LOCKS ----------------
+     Each one is lock(el, submit, started): it draws itself into el, calls started() when the
+     visitor begins an attempt, and submit(value) when they finish (submit(null, 'why') for an
+     attempt that is not a real try). It returns { reset() }. */
+  const LOCK = {
+    pattern: {
+      say: 'Draw the pattern.',
+      make(el, submit, started) {
+        const p = pad(el, v => { if (v === null) { p.show('bad', 700); submit(null, 'Join at least 4 dots.'); } else { p.show('wait'); submit(v); } }, started);
+        return { reset: p.reset, bad() { p.show('bad', 800); } };
+      }
+    },
+
+    // The doorbell: a quick press is a dot, a held press is a dash. Stop for a moment and it is sent.
+    bell: {
+      say: 'Ring the bell. You know the knock.',
+      make(el, submit, started) {
+        el.innerHTML = '<div class="bell"><button type="button" class="press" aria-label="Doorbell. Quick press for a dot, hold for a dash."><i></i></button><div class="tape" aria-live="polite"></div></div>';
+        const btn = el.querySelector('.press'), tape = el.querySelector('.tape');
+        let seq = '', t0 = 0, timer = null, down = false;
+        const paint = () => { tape.innerHTML = seq.split('').map(c => '<b class="' + (c === '.' ? 'dit' : 'dah') + '"></b>').join(''); };
+        const reset = () => { clearTimeout(timer); seq = ''; down = false; btn.classList.remove('down'); paint(); };
+        const press = () => { if (down) return; if (!seq) started(); down = true; t0 = Date.now(); clearTimeout(timer); btn.classList.add('down'); };
+        const release = () => {
+          if (!down) return;
+          down = false; btn.classList.remove('down');
+          const dash = Date.now() - t0 >= 300;
+          seq += dash ? '-' : '.'; tone(dash ? 660 : 880, dash ? 380 : 130); paint();
+          if (seq.length >= 8) { submit(seq); return; }
+          timer = setTimeout(() => submit(seq), 1300);
+        };
+        btn.addEventListener('pointerdown', e => { e.preventDefault(); try { btn.setPointerCapture(e.pointerId); } catch (x) {} press(); });
+        btn.addEventListener('pointerup', release);
+        btn.addEventListener('pointercancel', reset);
+        btn.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); press(); } });
+        btn.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); release(); } });
+        btn.addEventListener('contextmenu', e => e.preventDefault());
+        return { reset };
+      }
+    },
+
+    // The piano: eight keys, play the notes in order. Stop for a moment and it is sent.
+    piano: {
+      say: 'Play the tune.',
+      make(el, submit, started) {
+        const hz = [261.6, 293.7, 329.6, 349.2, 392.0, 440.0, 493.9, 523.3];
+        el.innerHTML = '<div class="piano">' + hz.map((f, i) => '<button type="button" data-i="' + i + '" aria-label="Key ' + (i + 1) + '"></button>').join('') + '</div><div class="tape" aria-live="polite"></div>';
+        const tape = el.querySelector('.tape');
+        let seq = [], timer = null;
+        const paint = () => { tape.innerHTML = seq.map(() => '<b class="dit"></b>').join(''); };
+        const reset = () => { clearTimeout(timer); seq = []; paint(); };
+        el.querySelector('.piano').addEventListener('click', e => {
+          const k = e.target.closest('button'); if (!k) return;
+          if (!seq.length) started();
+          const i = +k.dataset.i; seq.push(i); tone(hz[i], 450); paint();
+          k.classList.add('hit'); setTimeout(() => k.classList.remove('hit'), 160);
+          clearTimeout(timer);
+          if (seq.length >= 10) { submit(seq.join('-')); return; }
+          timer = setTimeout(() => submit(seq.join('-')), 1400);
+        });
+        return { reset };
+      }
+    },
+
+    // The fuse box: six switches, then pull the handle.
+    switches: {
+      say: 'Flip the right switches, then pull the handle.',
+      make(el, submit, started) {
+        el.innerHTML = '<div class="fuses">' + Array.from({ length: 6 }, (x, i) => '<button type="button" class="sw" role="switch" aria-checked="false" aria-label="Switch ' + (i + 1) + '"><i></i></button>').join('') + '</div>' +
+          '<button type="button" class="pull">Pull the handle</button>';
+        const sw = [...el.querySelectorAll('.sw')];
+        const reset = () => sw.forEach(s => s.setAttribute('aria-checked', 'false'));
+        sw.forEach(s => s.addEventListener('click', () => { started(); s.setAttribute('aria-checked', s.getAttribute('aria-checked') === 'true' ? 'false' : 'true'); }));
+        el.querySelector('.pull').addEventListener('click', () => submit(sw.map(s => s.getAttribute('aria-checked') === 'true' ? 1 : 0).join('')));
+        return { reset };
+      }
+    },
+
+    // The clock: tap to move the hands to the secret time.
+    clock: {
+      say: 'Set the clock to the right time.',
+      make(el, submit, started) {
+        const tick = i => { const a = i * Math.PI / 6, r1 = i % 3 ? 86 : 80; return '<line x1="' + (100 + r1 * Math.sin(a)) + '" y1="' + (100 - r1 * Math.cos(a)) + '" x2="' + (100 + 92 * Math.sin(a)) + '" y2="' + (100 - 92 * Math.cos(a)) + '"/>'; };
+        el.innerHTML = '<svg class="clock" viewBox="0 0 200 200" role="img"><circle cx="100" cy="100" r="96"/><g class="ticks">' + Array.from({ length: 12 }, (x, i) => tick(i)).join('') + '</g>' +
+          '<line class="hh" x1="100" y1="100" x2="100" y2="52"/><line class="mh" x1="100" y1="100" x2="100" y2="26"/><circle class="hub" cx="100" cy="100" r="5"/></svg>' +
+          '<div class="set"><button type="button" data-k="h">Hour</button><button type="button" data-k="m">Minute</button></div><button type="button" class="pull">Open</button>';
+        const svg = el.querySelector('.clock'), hh = el.querySelector('.hh'), mh = el.querySelector('.mh');
+        let h = 12, m = 0;
+        const paint = () => {
+          hh.setAttribute('transform', 'rotate(' + ((h % 12) * 30 + m * 0.5) + ' 100 100)'); mh.setAttribute('transform', 'rotate(' + m * 6 + ' 100 100)');
+          svg.setAttribute('aria-label', 'Clock showing ' + h + ':' + String(m).padStart(2, '0'));
+        };
+        const reset = () => { h = 12; m = 0; paint(); };
+        el.querySelector('.set').addEventListener('click', e => {
+          const b = e.target.closest('button'); if (!b) return;
+          started();
+          if (b.dataset.k === 'h') h = h % 12 + 1; else m = (m + 5) % 60;
+          paint();
+        });
+        el.querySelector('.pull').addEventListener('click', () => submit(h + ':' + m));
+        paint();
+        return { reset };
+      }
+    }
+  };
+
+  // Which lock is on the door this time. ?lock=bell in the address forces one.
+  let current = null;
+  function pick(not) {
+    const forced = new URLSearchParams(location.search).get('lock');
+    if (!not && KINDS.includes(forced)) return forced;
+    const pool = KINDS.filter(k => k !== not);
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function door(kind) {
+    current = kind || pick();
+    $app.innerHTML = '<main class="door"><div class="in">' +
+      '<div class="mark">' + GAMES.slice(0, 5).map(g => '<i style="background:' + g.hue + '"></i>').join('') + '</div>' +
+      '<h1>Game night</h1><p>Friends only. ' + LOCK[current].say + '</p><div id="lock" data-kind="' + current + '"></div><p class="err" role="alert" id="msg"></p>' +
+      '<button type="button" class="other" id="other">Try a different lock</button></div></main>';
+    const msg = document.getElementById('msg'), box = document.getElementById('lock');
+    const api = LOCK[current].make(box, (value, why) => {
+      if (value === null) { msg.textContent = why || ''; return; }
+      const key = fingerprintOf(current, value);
+      if (key === LOCKS[current]) { save('gn_key', ALL_KEY); box.classList.add('open'); setTimeout(shelf, 250); return; }
+      msg.textContent = 'Nope. Try again.';
+      box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+      if (api.bad) api.bad(); else setTimeout(api.reset, 500);
+    }, () => { msg.textContent = ''; });
+    document.getElementById('other').addEventListener('click', () => door(pick(current)));
+  }
+
+  function shelf() {
+    $app.innerHTML = '<main class="shelf">' +
+      '<header class="top"><h1>Game <span>night.</span></h1><p>Pick one, make a room, read out the code. Everyone plays on their own phone.</p></header>' +
+      '<div class="grid">' + GAMES.map((g, i) =>
+        '<a class="card" href="' + esc(g.file) + '" style="--hue:' + g.hue + ';--tint:' + g.tint + ';--deep:' + g.deep + '">' +
+        '<span class="blob"></span><span class="no">' + String(i + 1).padStart(2, '0') + '</span>' +
+        '<h2>' + esc(g.name) + '</h2><p>' + esc(g.line) + '</p>' +
+        '<div class="tags">' + g.tags.map(t => '<span>' + esc(t) + '</span>').join('') + '</div>' +
+        '<span class="go" aria-hidden="true">→</span></a>').join('') + '</div>' +
+      '<footer class="foot"><span>' + GAMES.length + ' games · no sign-up, no install</span><button id="relock">Lock this page again</button></footer></main>';
+    document.getElementById('relock').addEventListener('click', () => { save('gn_key', null); door(); });
+  }
+
+  // index.html#newlocks : pick a lock, do the new secret, get the line to paste into LOCKS.
+  function maker(kind) {
+    $app.innerHTML = '<main class="door"><div class="in"><h1>New secrets</h1><p>Pick a lock, then do the new secret on it.</p>' +
+      '<div class="kinds">' + KINDS.map(k => '<button type="button" data-k="' + k + '"' + (k === kind ? ' class="on"' : '') + '>' + k + '</button>').join('') + '</div>' +
+      (kind ? '<p>' + LOCK[kind].say + '</p><div id="lock" data-kind="' + kind + '"></div><p class="err" role="alert" id="msg"></p><pre id="out" hidden></pre>' +
+        '<p id="how" hidden>Open index.html in an editor and paste this over the <b>' + kind + '</b> line in LOCKS. Do it again here if your hand slipped.</p>' : '') +
+      '<p><a href="index.html">Back to the door</a></p></div></main>';
+    $app.querySelector('.kinds').addEventListener('click', e => { const b = e.target.closest('button'); if (b) maker(b.dataset.k); });
+    if (!kind) return;
+    const msg = document.getElementById('msg'), out = document.getElementById('out');
+    const api = LOCK[kind].make(document.getElementById('lock'), (value, why) => {
+      if (value === null) { msg.textContent = why || ''; return; }
+      out.textContent = '  ' + kind + ": '" + fingerprintOf(kind, value) + "',"; out.hidden = false; document.getElementById('how').hidden = false;
+      if (kind !== 'switches' && kind !== 'clock') setTimeout(api.reset, 900);
+    }, () => { msg.textContent = ''; });
+  }
+
+  const route = () => location.hash === '#newlocks' ? maker() : unlocked() ? shelf() : door();
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+</body>
+</html>
