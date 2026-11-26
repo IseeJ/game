@@ -72,6 +72,11 @@ input::placeholder { color: #aaa397; font-weight: 400; }
 .code.small { font-size: 2rem; letter-spacing: 0; line-height: 1.2; }
 .lobby h2 { margin: 20px 0 0; font-size: 1.1rem; text-align: left; }
 .packs { display: grid; gap: 6px; }
+.lang { display: inline-flex; align-self: flex-end; background: var(--panel); border-radius: 999px; padding: 3px; gap: 2px; }
+.lang button { appearance: none; border: 0; background: none; border-radius: 999px; padding: 5px 13px; font-weight: 700; font-size: .85rem; color: var(--dim); cursor: pointer; }
+.lang button.on { background: var(--field); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+.lang button:disabled { cursor: default; }
+.field.inline .lang { align-self: center; }
 .pack, .tick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: 12px; font-weight: 700; text-align: left; cursor: pointer; }
 .pack input, .tick input { flex: none; width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
 .pack em, .tick em { margin-left: auto; font-style: normal; font-weight: 400; font-size: .85rem; color: var(--dim); }
@@ -144,6 +149,8 @@ button.opt:disabled { cursor: not-allowed; opacity: .5; }
 
 <!-- PeerJS: browser-to-browser connections, no server of your own needed -->
 <script src="bfl.js"></script>
+<!-- The Thai question packs. Leave this file out and the game is simply English only. -->
+<script src="bflth.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 
@@ -170,11 +177,83 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   const MODES = { bluff: 'Bluff: write lies', quiz: 'Quiz: just pick the answer' };
   const needPlayers = (mode, solo) => solo || mode === 'quiz' ? 1 : 2;      // fewest players to start
   const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  // Question packs come from bfl.js. "About us" is the built-in pack of questions about the players.
-  const FACT_PACKS = typeof PACKS !== 'undefined' ? PACKS : { 'Weird facts': FACTS };
-  const US = 'About us';
-  const PACK_NAMES = Object.keys(FACT_PACKS).concat(US);
-  const packSize = n => n === US ? ABOUT.length : FACT_PACKS[n].length;
+  /* ---------------- LANGUAGE ----------------
+     English is written straight into the code. This is the Thai for every line of it.
+     A line that is missing here simply shows in English. {0}, {1} are filled in by the game. */
+  const TH_UI = {
+    'Write a lie. Spot the truth. Fool your friends.': 'Write a lie. Spot the truth. Fool your friends.',
+    'Your name': 'ชื่อของคุณ', 'e.g. Sam': 'เช่น มายด์', 'Create a room': 'สร้างห้อง', 'or join with a code': 'หรือเข้าห้องด้วยรหัส',
+    'Room code': 'รหัสห้อง', 'Join': 'เข้าห้อง', 'or on your own': 'หรือเล่นคนเดียว', 'Play solo quiz': 'เล่นควิซคนเดียว',
+    '<b>Bluff:</b> a strange fact comes up with the answer missing. Everyone types a believable lie, or takes a ready-made one for half the points.':
+      '<b>โหมดโกหก:</b> จะมีเรื่องแปลก ๆ ขึ้นมาโดยเว้นคำตอบไว้ ทุกคนพิมพ์คำโกหกที่ฟังดูน่าเชื่อ หรือจะขอคำโกหกสำเร็จรูปก็ได้ แต่ได้คะแนนแค่ครึ่งเดียว',
+    'All the lies appear with the real answer hidden among them. {0} points for finding the truth, {1} for every friend who falls for your lie.':
+      'คำโกหกทั้งหมดจะขึ้นมาปนกับคำตอบจริง เลือกความจริงถูกได้ {0} คะแนน และได้ {1} คะแนนต่อเพื่อนหนึ่งคนที่หลงเชื่อคำโกหกของคุณ',
+    'With only two of you, the game adds decoys of its own. Pick one and you lose {0} points.':
+      'ถ้าเล่นกันแค่สองคน เกมจะเติมคำตอบหลอกของเกมเองเข้าไปด้วย ใครเลือกโดนจะเสีย {0} คะแนน',
+    'In "About us" questions (three players or more) one of you tells the truth and the rest lie about them.':
+      'คำถามชุด "เรื่องของพวกเรา" (สามคนขึ้นไป) จะมีหนึ่งคนตอบความจริงเกี่ยวกับตัวเอง ส่วนคนที่เหลือแต่งเรื่องโกหกเกี่ยวกับคนนั้น',
+    '<b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.':
+      '<b>โหมดควิซ:</b> ไม่ต้องโกหก มีสี่ตัวเลือก ถูกแค่ข้อเดียว เล่นกับเพื่อนหรือเล่นคนเดียวก็ได้',
+    'Need 1 more player': 'ขาดอีก 1 คน', 'Need {0} more players': 'ขาดอีก {0} คน', 'Tick a pack first': 'เลือกชุดคำถามก่อน',
+    '"About us" needs 3 players': '"เรื่องของพวกเรา" ต้องมี 3 คน',
+    'Language': 'ภาษา', 'Game': 'โหมด', 'Bluff: write lies': 'โกหก: แต่งคำตอบหลอก', 'Quiz: just pick the answer': 'ควิซ: เลือกคำตอบอย่างเดียว',
+    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
+    'Start': 'เริ่ม', 'Start game': 'เริ่มเกม', 'Solo quiz': 'ควิซคนเดียว', 'You against the facts': 'คุณ ปะทะ ข้อเท็จจริง',
+    'Four answers, one is true.': 'สี่ตัวเลือก ถูกแค่ข้อเดียว', ' Your best: {0}.': ' สถิติดีที่สุด: {0}', 'Back to the start': 'กลับหน้าแรก',
+    'Copy invite link': 'คัดลอกลิงก์ชวนเพื่อน', 'Players': 'ผู้เล่น', 'host': 'เจ้าของห้อง', 'you': 'คุณ',
+    'With two players the game adds decoy answers of its own, and "About us" questions are left out.': 'เล่นสองคน เกมจะเติมคำตอบหลอกให้เอง และจะไม่มีคำถามชุด "เรื่องของพวกเรา"',
+    'Keep this tab open. You are hosting, so the room closes if you leave.': 'อย่าปิดแท็บนี้ คุณเป็นเจ้าของห้อง ถ้าออกไปห้องจะปิดทันที',
+    'Waiting for the host to start. {0}, {1} questions from: {2}.': 'รอเจ้าของห้องเริ่มเกม · {0} {1} ข้อ จากชุด: {2}',
+    'Timed quiz': 'ควิซจับเวลา', 'Quiz': 'ควิซ', 'Bluff': 'โกหก',
+    '{0} of {1}': '{0} จาก {1}', '{0} of {1} in {2}': '{0} จาก {1} ใน {2}',
+    'Weird fact': 'เรื่องแปลก', 'About you': 'เรื่องของคุณ', 'About {0}': 'เรื่องของ {0}', 'Someone': 'ใครบางคน', 'You': 'คุณ',
+    'done': 'เสร็จ', 'Room': 'ห้อง', 'End the race now': 'จบการแข่งเดี๋ยวนี้',
+    'A timed quiz is under way. You will be in the next game.': 'กำลังแข่งควิซจับเวลากันอยู่ คุณจะได้เล่นในเกมถัดไป',
+    'Finished': 'เสร็จแล้ว', 'All done': 'ทำครบแล้ว',
+    'Waiting for the others to finish. Results appear when everyone is done.': 'รอคนอื่นทำให้เสร็จ ผลจะขึ้นเมื่อทุกคนทำครบ',
+    'Question {0} of {1}': 'ข้อ {0} จาก {1}', 'Which one is true?': 'ข้อไหนคือเรื่องจริง', 'Correct!': 'ถูกต้อง!', 'Not this time.': 'ยังไม่ใช่',
+    'The truth': 'ความจริง', 'your pick': 'คุณเลือกข้อนี้', 'Finish': 'เสร็จสิ้น', 'Next question': 'ข้อต่อไป',
+    '1 more person': 'อีก 1 คน', '{0} more people': 'อีก {0} คน',
+    'This question is already going. You can vote when the answers are in.': 'ข้อนี้เริ่มไปแล้ว รอโหวตได้เมื่อทุกคนส่งคำตอบครบ',
+    'Handed in. Waiting on {0}.': 'ส่งแล้ว รอ{0}', 'Your truth': 'ความจริงของคุณ', 'Your ready-made lie (half points)': 'คำโกหกสำเร็จรูปของคุณ (ครึ่งคะแนน)', 'Your lie': 'คำโกหกของคุณ',
+    'Tell the truth. Everyone else is busy lying about you.': 'ตอบตามความจริง คนอื่นกำลังแต่งเรื่องโกหกเกี่ยวกับคุณอยู่',
+    'Write a lie that sounds true.': 'แต่งคำโกหกที่ฟังดูเหมือนเรื่องจริง', 'Make up an answer that sounds like {0}.': 'แต่งคำตอบที่ฟังดูเหมือนเป็น {0}',
+    'The honest answer': 'คำตอบจริง', 'Your most convincing lie': 'คำโกหกที่เนียนที่สุดของคุณ',
+    'Keep it short. Your friends will have to pick it out from the lies.': 'ตอบสั้น ๆ เพื่อนต้องหาคำตอบนี้ให้เจอท่ามกลางคำโกหก',
+    'Keep it short and plausible. You score when friends pick it.': 'สั้น ๆ และน่าเชื่อ ได้คะแนนเมื่อเพื่อนเลือกคำตอบของคุณ',
+    'Lock in the truth': 'ยืนยันความจริง', 'Hand in my lie': 'ส่งคำโกหก', 'Give me a lie (half points)': 'ขอคำโกหกสำเร็จรูป (ครึ่งคะแนน)', 'Carry on without them': 'ไปต่อไม่รอแล้ว',
+    ' That is {0} in a row.': ' ถูกติดกัน {0} ข้อแล้ว', 'The truth about you.': 'ความจริงเกี่ยวกับคุณ', 'The truth about {0}.': 'ความจริงเกี่ยวกับ {0}', 'The truth is out.': 'เฉลยแล้ว',
+    'Your friends are working out which one is really you. Waiting on {0}.': 'เพื่อน ๆ กำลังเดาว่าข้อไหนคือคุณตัวจริง รอ{0}',
+    'Which one is the truth?': 'ข้อไหนคือความจริง', 'Vote is in. Waiting on {0}.': 'โหวตแล้ว รอ{0}',
+    '{0} wrote it by accident': '{0} เผลอเขียนคำตอบจริง', 'A trap set by the game': 'กับดักของเกม', '{0}\'s lie': 'คำโกหกของ {0}', ' (ready-made)': ' (สำเร็จรูป)',
+    'found by {0}': '{0} หาเจอ', 'picked by {0}': '{0} เลือกข้อนี้', 'caught {0}': '{0} ติดกับ', 'fooled {0}': 'หลอก {0} ได้', 'nobody found it': 'ไม่มีใครหาเจอ',
+    'your lie': 'คำโกหกของคุณ', 'Nobody scored. Impressive.': 'ไม่มีใครได้คะแนนเลย สุดยอด',
+    'See how you did': 'ดูผลของคุณ', 'See final scores': 'ดูคะแนนรวม', 'Show the answer now': 'เฉลยเลย',
+    'Flawless. Suspicious, even.': 'ไร้ที่ติ จนน่าสงสัย', 'Sharp. The facts are worried.': 'คมมาก ข้อเท็จจริงเริ่มหวั่นแล้ว',
+    'Respectable. The facts put up a fight.': 'ใช้ได้เลย แต่ข้อเท็จจริงก็สู้ไม่ถอย', 'The facts win this one.': 'รอบนี้ข้อเท็จจริงชนะ',
+    ' Your best is {0}.': ' สถิติดีที่สุดของคุณคือ {0}', 'Play again': 'เล่นอีกรอบ', 'Change packs': 'เปลี่ยนชุดคำถาม',
+    '{0} wins': '{0} ชนะ', 'Everyone ties': 'เสมอกันทุกคน', '{0} and {1} tie': '{0} และ {1} เสมอกัน',
+    'Fastest brain': 'สมองไวที่สุด', 'Top of the class': 'ที่หนึ่งของห้อง', 'Best liar': 'นักโกหกตัวท็อป', 'did not finish': 'ทำไม่จบ',
+    'Back to lobby': 'กลับห้องรอ', 'Waiting for the host to start another game.': 'รอเจ้าของห้องเริ่มเกมใหม่',
+    'Connection lost': 'การเชื่อมต่อหลุด', 'The link to the host dropped. If the host closed the game, the room is gone.': 'เชื่อมต่อกับเจ้าของห้องไม่ได้ ถ้าเจ้าของห้องปิดเกมไปแล้ว ห้องนี้จะหายไป',
+    'Try to reconnect': 'ลองเชื่อมต่อใหม่', 'Leave': 'ออก', 'Creating room…': 'กำลังสร้างห้อง…', 'Joining {0}…': 'กำลังเข้าห้อง {0}…',
+    'Could not reach the connection server. Check your internet and try again.': 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่',
+    'Could not find that room. Check the code and make sure the host still has the game open.': 'ไม่เจอห้องนี้ ตรวจรหัสอีกครั้ง และดูว่าเจ้าของห้องยังเปิดเกมอยู่',
+    'No room with that code. Check it and try again.': 'ไม่มีห้องที่ใช้รหัสนี้ ตรวจแล้วลองใหม่', 'Connection problem. Check your internet and try again.': 'การเชื่อมต่อมีปัญหา ตรวจอินเทอร์เน็ตแล้วลองใหม่',
+    'That room is full.': 'ห้องเต็มแล้ว', '{0} left before telling the truth. Next question.': '{0} ออกไปก่อนจะตอบความจริง ข้ามไปข้อต่อไป',
+    'Tick a pack of facts first.': 'เลือกชุดคำถามความรู้ก่อน', 'Not enough players left. Back to the lobby.': 'ผู้เล่นเหลือไม่พอ กลับไปที่ห้องรอ',
+    'Nothing to ask with these packs and this many players.': 'ชุดคำถามที่เลือกกับจำนวนคนเท่านี้ ไม่มีข้อไหนถามได้',
+    'No ready-made lie for this one. Write your own.': 'ข้อนี้ไม่มีคำโกหกสำเร็จรูป แต่งเองนะ', 'That is the real answer! Write a lie instead.': 'นั่นมันคำตอบจริง! แต่งเรื่องโกหกแทนสิ',
+    'Pick a name first.': 'ใส่ชื่อก่อน', 'The connection library did not load. Refresh the page.': 'โหลดตัวเชื่อมต่อไม่สำเร็จ ลองรีเฟรชหน้านี้',
+    'Room codes are 5 letters.': 'รหัสห้องมี 5 ตัวอักษร', 'Invite link copied.': 'คัดลอกลิงก์แล้ว', 'Copy this link:': 'คัดลอกลิงก์นี้:', 'Reconnecting…': 'กำลังเชื่อมต่อใหม่…'
+  };
+  // Question packs come from bfl.js, and their Thai versions from bfl-th.js (optional: without it there is no language switch).
+  const DATA = { en: { packs: typeof PACKS !== 'undefined' ? PACKS : { 'Weird facts': FACTS }, about: ABOUT, us: 'About us' } };
+  if (typeof BFL_TH !== 'undefined' && BFL_TH && BFL_TH.PACKS) DATA.th = { packs: BFL_TH.PACKS, about: BFL_TH.ABOUT || [], us: 'เรื่องของพวกเรา' };
+  const dataOf = l => DATA[l] || DATA.en;
+  const packNames = l => Object.keys(dataOf(l).packs).concat(dataOf(l).about.length ? [dataOf(l).us] : []);
+  const packSize = (l, n) => n === dataOf(l).us ? dataOf(l).about.length : dataOf(l).packs[n].length;
+  const GD = () => dataOf(G.lang), isUs = n => n === GD().us;          // host: the data for the room's language
 
   const $app = document.getElementById('app'), $toast = document.getElementById('toast');
   const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
@@ -196,13 +275,17 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   let busy = '', homeErr = '', lost = false, joinTimer = null;
   let draft = '', nope = '', selKey = '';
   let race = null;     // my own progress in a timed quiz: { id, i, score, ms, picked, t0 }
+  let uiLang = DATA.th && load('localStorage', 'bfl_lang') === 'th' ? 'th' : 'en';     // my language until I am in a room
+  const lang = () => view && DATA[view.lang] ? view.lang : uiLang;                    // in a room, the room's language
+  const t = (s, ...a) => ((lang() === 'th' && TH_UI[s]) || s).replace(/\{(\d)\}/g, (m, i) => a[i]);
 
   // The packs the host ticked last time, or all of them.
-  function savedPacks() {
+  const packsKey = l => l === 'th' ? 'bfl_packs_th' : 'bfl_packs';
+  function savedPacks(l) {
     let list = [];
-    try { list = JSON.parse(load('localStorage', 'bfl_packs')) || []; } catch (e) {}
-    list = PACK_NAMES.filter(n => Array.isArray(list) && list.includes(n));
-    return list.length ? list : PACK_NAMES.slice();
+    try { list = JSON.parse(load('localStorage', packsKey(l))) || []; } catch (e) {}
+    list = packNames(l).filter(n => Array.isArray(list) && list.includes(n));
+    return list.length ? list : packNames(l);
   }
 
   // Solo: the best result so far, kept on this device.
@@ -212,7 +295,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     if (!b || r > br || (r === br && (of > b.of || (of === b.of && ms && (!b.ms || ms < b.ms))))) save('localStorage', 'bfl_best', JSON.stringify({ score, of, ms: ms || 0 }));
   }
   const clock = ms => { const s = ms / 1000; return s < 60 ? s.toFixed(1) + 's' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
-  const bestText = b => b.score + ' of ' + b.of + (b.ms ? ' in ' + clock(b.ms) : '');
+  const bestText = b => b.ms ? t('{0} of {1} in {2}', b.score, b.of, clock(b.ms)) : t('{0} of {1}', b.score, b.of);
 
   /* ---------------- HOST ---------------- */
   const P = pid => G.players.find(p => p.pid === pid);
@@ -221,14 +304,14 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function createRoom() {
     isHost = true;
     const code = makeCode();
-    busy = 'Creating room…'; render();
+    busy = t('Creating room…'); render();
     peer = new Peer(PREFIX + code);
     peer.on('open', () => {
       busy = ''; roomCode = code;
       G = {
         code, phase: 'lobby', solo: false, mode: load('localStorage', 'bfl_mode') === 'quiz' ? 'quiz' : 'bluff',
         timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
-        streak: 0, canned: {}, rounds: 8, packs: savedPacks(),
+        streak: 0, canned: {}, rounds: 8, lang: uiLang, packs: savedPacks(uiLang),
         round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
         q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
@@ -247,7 +330,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     });
     peer.on('error', err => {
       if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
-      else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
+      else if (!G) { peer.destroy(); busy = ''; homeErr = t('Could not reach the connection server. Check your internet and try again.'); render(); }
     });
     peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
   }
@@ -256,10 +339,10 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function startSolo() {
     isHost = true;
     G = {
-      code: '', phase: 'lobby', solo: true, mode: 'quiz', streak: 0, canned: {}, rounds: 10, packs: savedPacks(),
+      code: '', phase: 'lobby', solo: true, mode: 'quiz', streak: 0, canned: {}, rounds: 10, lang: uiLang, packs: savedPacks(uiLang),
       timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
       round: 0, hostPid: myPid,
-      players: [{ pid: myPid, name: myName.trim() || 'You', score: 0, gain: 0, conn: null, connected: true }],
+      players: [{ pid: myPid, name: myName.trim() || t('You'), score: 0, gain: 0, conn: null, connected: true }],
       q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
     };
     sync();
@@ -290,7 +373,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     p.conn = null; p.connected = false;
     if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
     if (G.phase === 'write' && G.q.subject === p.pid && !G.subs[p.pid]) {
-      toastAll(p.name + ' left before telling the truth. Next question.');
+      toastAll(t('{0} left before telling the truth. Next question.', p.name));
       G.round--; startRound(); return;
     }
     if (G.phase === 'race') finishRace();
@@ -313,7 +396,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const take = list => { for (const x of shuffle(list)) { if (out.length >= n) return; const k = tidy(x); if (k && !avoid.has(k)) { avoid.add(k); out.push(x); } } };
     take(decoysOf(d.f));
     if (out.length < n) {
-      const others = FACT_PACKS[d.pack].filter(g => g !== d.f).map(g => truthsOf(g)[0]);
+      const others = GD().packs[d.pack].filter(g => g !== d.f).map(g => truthsOf(g)[0]);
       take(others.filter(a => /\d/.test(a) === isNum && Math.abs(a.split(' ').length - words) <= 1));
       take(others);
     }
@@ -325,7 +408,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     G.players.forEach(p => { p.score = 0; p.gain = 0; });
     G.round = 0; G.lastSubject = null; G.streak = 0;
     // Every fact from every ticked pack goes into one shuffled pile, remembering which pack it came from.
-    G.pool = [].concat(...G.packs.filter(n => n !== US).map(n => FACT_PACKS[n].map(f => ({ f, pack: n }))));
+    G.pool = [].concat(...G.packs.filter(n => !isUs(n)).map(n => GD().packs[n].map(f => ({ f, pack: n }))));
     G.decks.facts = [];
     G.raced = false;
     if (G.mode === 'quiz' && G.timed) startRace(); else startRound();
@@ -338,7 +421,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const live = G.players.filter(p => p.connected);
     if (!G.pool.length || !live.length) {
       G.phase = 'lobby'; G.players = live;
-      toastAll('Tick a pack of facts first.');
+      toastAll(t('Tick a pack of facts first.'));
       sync(); return;
     }
     const qs = [], n = Math.min(G.rounds, G.pool.length);
@@ -364,10 +447,10 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function startRound() {
     const live = G.players.filter(p => p.connected), quiz = G.mode === 'quiz';
     const useFacts = G.pool.length > 0;
-    const useUs = !quiz && G.packs.includes(US) && ABOUT.length > 0 && live.length >= 3;     // "About us" needs someone to lie and someone else to guess
+    const useUs = !quiz && G.packs.some(isUs) && GD().about.length > 0 && live.length >= 3;     // "About us" needs someone to lie and someone else to guess
     if (live.length < needPlayers(G.mode, G.solo) || (!useFacts && !useUs)) {
       G.phase = 'lobby'; G.players = live;
-      toastAll(useFacts || useUs ? 'Not enough players left. Back to the lobby.' : 'Nothing to ask with these packs and this many players.');
+      toastAll(useFacts || useUs ? t('Not enough players left. Back to the lobby.') : t('Nothing to ask with these packs and this many players.'));
       sync(); return;
     }
     G.round++;
@@ -380,7 +463,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       let subject = live[0];
       for (let i = 1; i <= n; i++) { const c = G.players[(cur + i + n) % n]; if (c.connected) { subject = c; break; } }
       G.lastSubject = subject.pid;
-      const a = draw('us', ABOUT);
+      const a = draw('us', GD().about);
       G.q = { kind, you: a[0], them: a[1], truths: [], subject: subject.pid };
     } else {
       const d = draw('facts', G.pool);
@@ -454,10 +537,16 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         if (amHost && G.phase === 'lobby') { G.rounds = Math.min(30, Math.max(3, parseInt(msg.rounds, 10) || 8)); sync(); }
         break;
       case 'pack':                              // tick or untick one pack
-        if (!amHost || G.phase !== 'lobby' || !PACK_NAMES.includes(msg.name)) return;
-        G.packs = PACK_NAMES.filter(n => n === msg.name ? !!msg.on : G.packs.includes(n));
+        if (!amHost || G.phase !== 'lobby' || !packNames(G.lang).includes(msg.name)) return;
+        G.packs = packNames(G.lang).filter(n => n === msg.name ? !!msg.on : G.packs.includes(n));
         if (!G.packs.length) G.packs = [msg.name];              // at least one pack stays on
-        save('localStorage', 'bfl_packs', JSON.stringify(G.packs));
+        save('localStorage', packsKey(G.lang), JSON.stringify(G.packs));
+        sync();
+        break;
+      case 'lang':                              // the room's language: the questions and everyone's screen
+        if (!amHost || G.phase !== 'lobby' || !DATA[msg.lang] || msg.lang === G.lang) return;
+        G.lang = uiLang = msg.lang; save('localStorage', 'bfl_lang', G.lang);
+        G.packs = savedPacks(G.lang); G.decks = { facts: [], us: [] };
         sync();
         break;
       case 'mode':
@@ -531,7 +620,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function viewFor(pid) {
     const ph = G.phase, q = G.q;
     const v = {
-      code: G.code, phase: ph, solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
+      code: G.code, phase: ph, lang: G.lang, solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
       total: G.raced && G.race ? G.race.qs.length : G.rounds, streak: G.streak, rounds: G.rounds, packs: G.packs, round: G.round, you: pid, hostPid: G.hostPid,
       players: G.players.map(p => ({
         pid: p.pid, name: p.name, score: p.score, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0,
@@ -589,13 +678,13 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   /* ---------------- GUEST ---------------- */
   function joinRoom(code) {
     isHost = false; roomCode = code;
-    busy = 'Joining ' + code + '…'; render();
+    busy = t('Joining {0}…', code); render();
     peer = new Peer();
-    joinTimer = setTimeout(() => joinFail('Could not find that room. Check the code and make sure the host still has the game open.'), 15000);
+    joinTimer = setTimeout(() => joinFail(t('Could not find that room. Check the code and make sure the host still has the game open.')), 15000);
     peer.on('open', () => connectHost());
     peer.on('error', err => {
-      if (err.type === 'peer-unavailable') { if (view) { lost = true; render(true); } else joinFail('No room with that code. Check it and try again.'); }
-      else if (!view) joinFail('Connection problem. Check your internet and try again.');
+      if (err.type === 'peer-unavailable') { if (view) { lost = true; render(true); } else joinFail(t('No room with that code. Check it and try again.')); }
+      else if (!view) joinFail(t('Connection problem. Check your internet and try again.'));
     });
     peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
   }
@@ -610,7 +699,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         clearTimeout(joinTimer); busy = ''; const was = lost; lost = false;
         if (!view) setRoomUrl(roomCode);
         view = msg.v; render(was);
-      } else if (msg.t === 'full') joinFail('That room is full.');
+      } else if (msg.t === 'full') joinFail(t('That room is full.'));
       else onMsg(msg);
     });
     conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(true); } });
@@ -619,7 +708,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function onMsg(msg) {
     if (msg.t === 'toast') toast(msg.text);
     else if (msg.t === 'nope') {                // I typed the real answer by accident
-      nope = msg.why === 'none' ? 'No ready-made lie for this one. Write your own.' : 'That is the real answer! Write a lie instead.';
+      nope = msg.why === 'none' ? t('No ready-made lie for this one. Write your own.') : t('That is the real answer! Write a lie instead.');
       const el = document.getElementById('nope'); if (el) el.textContent = nope;
     }
   }
@@ -647,9 +736,10 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
   }
 
-  const people = n => n + ' more ' + (n === 1 ? 'person' : 'people');
+  const people = n => n === 1 ? t('1 more person') : t('{0} more people', n);
 
   function render(force) {
+    document.documentElement.lang = lang();
     if (!view) { $app.innerHTML = homeHTML(); return; }
     if (view.phase === 'race' && (!race || race.id !== view.race.id)) {       // a new race, or I have just come back to one
       const me = view.players.find(p => p.pid === view.you) || {};
@@ -674,69 +764,78 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     }
     let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : view.phase === 'race' ? raceHTML() : gameHTML();
     if (lost) {
-      html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2><p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
-        '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button><button class="btn" data-act="leave">Leave</button></div></div></div>';
+      html += '<div class="overlay"><div class="dialog"><h2>' + t('Connection lost') + '</h2><p>' + t('The link to the host dropped. If the host closed the game, the room is gone.') + '</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">' + t('Try to reconnect') + '</button><button class="btn" data-act="leave">' + t('Leave') + '</button></div></div></div>';
     }
     $app.innerHTML = html;
     const box = document.getElementById('answer');
     if (box && !same) box.focus();
   }
 
+  // The EN / ไทย switch. It only appears when bfl-th.js is there.
+  function langHTML(off) {
+    if (!DATA.th) return '';
+    const l = lang();
+    return '<div class="lang" role="group" aria-label="Language">' + [['en', 'EN'], ['th', 'ไทย']].map(x =>
+      '<button data-act="lang" data-l="' + x[0] + '"' + (l === x[0] ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + (off ? ' disabled' : '') + '>' + x[1] + '</button>').join('') + '</div>';
+  }
+
   function homeHTML() {
     const dis = busy ? ' disabled' : '';
-    return '<main class="home">' +
+    return '<main class="home">' + langHTML(!!busy) +
       '<h1 class="logo">Big Fat<br><i>Truth</i> Lie.</h1>' +
-      '<p class="tag">Write a lie. Spot the truth. Fool your friends.</p>' +
-      '<label class="field"><span>Your name</span><input id="name" maxlength="16" autocomplete="off" placeholder="e.g. Sam" value="' + esc(myName) + '"' + dis + '></label>' +
-      '<button class="btn primary big" data-act="create"' + dis + '>Create a room</button>' +
-      '<div class="or"><span>or join with a code</span></div>' +
-      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Room code" value="' + esc(roomCode) + '"' + dis + '>' +
-      '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
+      '<p class="tag">' + t('Write a lie. Spot the truth. Fool your friends.') + '</p>' +
+      '<label class="field"><span>' + t('Your name') + '</span><input id="name" maxlength="16" autocomplete="off" placeholder="' + t('e.g. Sam') + '" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>' + t('Create a room') + '</button>' +
+      '<div class="or"><span>' + t('or join with a code') + '</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="' + t('Room code') + '" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>' + t('Join') + '</button></div>' +
       (busy ? '<p class="note">' + esc(busy) + '</p>' : '') + (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
-      '<div class="or"><span>or on your own</span></div>' +
-      '<button class="btn big" data-act="solo"' + dis + '>Play solo quiz</button>' +
-      '<ol class="how"><li><b>Bluff:</b> a strange fact comes up with the answer missing. Everyone types a believable lie, or takes a ready-made one for half the points.</li>' +
-      '<li>All the lies appear with the real answer hidden among them. ' + FIND + ' points for finding the truth, ' + FOOL + ' for every friend who falls for your lie.</li>' +
-      '<li>With only two of you, the game adds decoys of its own. Pick one and you lose ' + TRAP + ' points.</li>' +
-      '<li>In "About us" questions (three players or more) one of you tells the truth and the rest lie about them.</li>' +
-      '<li><b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.</li></ol>' +
+      '<div class="or"><span>' + t('or on your own') + '</span></div>' +
+      '<button class="btn big" data-act="solo"' + dis + '>' + t('Play solo quiz') + '</button>' +
+      '<ol class="how"><li>' + t('<b>Bluff:</b> a strange fact comes up with the answer missing. Everyone types a believable lie, or takes a ready-made one for half the points.') + '</li>' +
+      '<li>' + t('All the lies appear with the real answer hidden among them. {0} points for finding the truth, {1} for every friend who falls for your lie.', FIND, FOOL) + '</li>' +
+      '<li>' + t('With only two of you, the game adds decoys of its own. Pick one and you lose {0} points.', TRAP) + '</li>' +
+      '<li>' + t('In "About us" questions (three players or more) one of you tells the truth and the rest lie about them.') + '</li>' +
+      '<li>' + t('<b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.') + '</li></ol>' +
       '</main>';
   }
 
   function lobbyHTML() {
-    const v = view, amHost = v.you === v.hostPid, n = v.players.length, quiz = v.mode === 'quiz';
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length, quiz = v.mode === 'quiz', us = dataOf(v.lang).us;
     const rounds = [5, 8, 10, 15, 20].map(g => '<option value="' + g + '"' + (g === v.rounds ? ' selected' : '') + '>' + g + '</option>').join('');
-    const names = PACK_NAMES.filter(p => !(quiz && p === US));               // "About us" needs lies, so it is not in the quiz
+    const names = packNames(v.lang).filter(p => !(quiz && p === us));        // "About us" needs lies, so it is not in the quiz
     const ticked = v.packs.filter(p => names.includes(p));
-    const hasFacts = ticked.some(p => p !== US), need = needPlayers(v.mode, v.solo);
-    const block = n < need ? 'Need ' + (need - n) + ' more player' + (need - n > 1 ? 's' : '')
-      : !ticked.length ? 'Tick a pack first'
-      : !hasFacts && n < 3 ? '"About us" needs 3 players' : '';
+    const hasFacts = ticked.some(p => p !== us), need = needPlayers(v.mode, v.solo);
+    const block = n < need ? (need - n > 1 ? t('Need {0} more players', need - n) : t('Need 1 more player'))
+      : !ticked.length ? t('Tick a pack first')
+      : !hasFacts && n < 3 ? t('"About us" needs 3 players') : '';
     const settings =
-      (v.solo ? '' : '<label class="field inline"><span>Game</span><select id="mode">' +
-        Object.keys(MODES).map(k => '<option value="' + k + '"' + (k === v.mode ? ' selected' : '') + '>' + MODES[k] + '</option>').join('') + '</select></label>') +
-      '<div class="field"><span>Question packs</span><div class="packs">' + names.map(p =>
-        '<label class="pack"><input type="checkbox" data-pack="' + esc(p) + '"' + (v.packs.includes(p) ? ' checked' : '') + '>' + esc(p) + '<em>' + packSize(p) + '</em></label>').join('') + '</div></div>' +
-      '<label class="field inline"><span>How many</span><select id="rounds">' + rounds + '</select></label>' +
-      (quiz ? '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="timed"' + (v.timed ? ' checked' : '') + '>Timed' +
-        '<em>' + (v.solo ? 'against the clock' : 'everyone at their own pace') + '</em></label></div></div>' : '') +
-      '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? 'Start' : 'Start game')) + '</button>';
+      (DATA.th ? '<div class="field inline"><span>' + t('Language') + '</span>' + langHTML() + '</div>' : '') +
+      (v.solo ? '' : '<label class="field inline"><span>' + t('Game') + '</span><select id="mode">' +
+        Object.keys(MODES).map(k => '<option value="' + k + '"' + (k === v.mode ? ' selected' : '') + '>' + t(MODES[k]) + '</option>').join('') + '</select></label>') +
+      '<div class="field"><span>' + t('Question packs') + '</span><div class="packs">' + names.map(p =>
+        '<label class="pack"><input type="checkbox" data-pack="' + esc(p) + '"' + (v.packs.includes(p) ? ' checked' : '') + '>' + esc(p) + '<em>' + packSize(v.lang, p) + '</em></label>').join('') + '</div></div>' +
+      '<label class="field inline"><span>' + t('How many') + '</span><select id="rounds">' + rounds + '</select></label>' +
+      (quiz ? '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="timed"' + (v.timed ? ' checked' : '') + '>' + t('Timed') +
+        '<em>' + (v.solo ? t('against the clock') : t('everyone at their own pace')) + '</em></label></div></div>' : '') +
+      '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? t('Start') : t('Start game'))) + '</button>';
     if (v.solo) {
       const b = bestSolo();
-      return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">You against the facts</div>' +
-        '<p class="note">Four answers, one is true.' + (b ? ' Your best: ' + bestText(b) + '.' : '') + '</p>' +
-        settings + '<button class="btn" data-act="leave">Back to the start</button></main>';
+      return '<main class="lobby"><p class="eyebrow">' + t('Solo quiz') + '</p><div class="code small">' + t('You against the facts') + '</div>' +
+        '<p class="note">' + t('Four answers, one is true.') + (b ? t(' Your best: {0}.', bestText(b)) : '') + '</p>' +
+        settings + '<button class="btn" data-act="leave">' + t('Back to the start') + '</button></main>';
     }
     return '<main class="lobby">' +
-      '<p class="eyebrow">Room code</p><div class="code">' + esc(v.code) + '</div>' +
-      '<button class="btn small" data-act="copy">Copy invite link</button>' +
-      '<h2>Players <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
-      '<ul class="plist">' + v.players.map(p => '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
+      '<p class="eyebrow">' + t('Room code') + '</p><div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">' + t('Copy invite link') + '</button>' +
+      '<h2>' + t('Players') + ' <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p => '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>' + t('host') + '</em>' : '') + (p.pid === v.you ? ' <em>' + t('you') + '</em>' : '') + '</li>').join('') + '</ul>' +
       (amHost
         ? settings +
-          (!quiz && n === 2 ? '<p class="fine">With two players the game adds decoy answers of its own, and "About us" questions are left out.</p>' : '') +
-          '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
-        : '<p class="note">Waiting for the host to start. ' + (quiz ? (v.timed ? 'Timed quiz' : 'Quiz') : 'Bluff') + ', ' + v.rounds + ' questions from: ' + esc(ticked.join(', ')) + '.</p>') +
+          (!quiz && n === 2 ? '<p class="fine">' + t('With two players the game adds decoy answers of its own, and "About us" questions are left out.') + '</p>' : '') +
+          '<p class="fine">' + t('Keep this tab open. You are hosting, so the room closes if you leave.') + '</p>'
+        : '<p class="note">' + t('Waiting for the host to start. {0}, {1} questions from: {2}.', quiz ? (v.timed ? t('Timed quiz') : t('Quiz')) : t('Bluff'), v.rounds, esc(ticked.join(', '))) + '</p>') +
       '</main>';
   }
 
@@ -751,7 +850,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   // The question card. A fact shows its gap, or the truth once it is revealed.
   function questionHTML(truth, other) {
     const q = other || view.q;
-    const label = q.kind !== 'us' ? esc(q.label || 'Weird fact') : 'About ' + (q.subjectPid === view.you ? 'you' : esc(nameOf(q.subjectPid)));
+    const label = q.kind !== 'us' ? esc(q.label || t('Weird fact')) : q.subjectPid === view.you ? t('About you') : t('About {0}', esc(nameOf(q.subjectPid)));
     const text = q.kind !== 'us'
       ? (q.text.includes('_____')
           ? esc(q.text).replace('_____', truth ? '<mark>' + esc(truth) + '</mark>' : '<span class="blank"></span>')
@@ -759,7 +858,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       : esc(q.text);
     return '<div class="q"><p>' + label + '</p><h2>' + text + '</h2></div>';
   }
-  const nameOf = pid => { const p = view.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+  const nameOf = pid => { const p = view.players.find(x => x.pid === pid); return p ? p.name : t('Someone'); };
+  const barHTML = right => '<header class="bar"><span>' + (view.solo ? t('Solo quiz') : t('Room') + ' <b>' + esc(view.code) + '</b>') + '</span><span>' + right + '</span></header>';
 
   /* ---------------- THE TIMED QUIZ ---------------- */
   // The strip at the top of a race: how far along everyone is. Scores stay hidden until the end.
@@ -768,32 +868,31 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     return '<ul class="scores">' + v.players.filter(p => p.racing).map(p => {
       const mine = p.pid === v.you, at = mine ? Math.min(n, race.i + (race.picked !== null ? 1 : 0)) : p.at;
       return '<li class="' + (p.connected ? '' : 'off ') + (mine ? 'me' : '') + '"><span class="nm">' + esc(p.name) + '</span>' +
-        (p.rdone ? '<span class="mk">done</span>' : '') + '<b>' + at + '/' + n + '</b></li>';
+        (p.rdone ? '<span class="mk">' + t('done') + '</span>' : '') + '<b>' + at + '/' + n + '</b></li>';
     }).join('') + '</ul>';
   }
 
   function raceHTML() {
     const v = view, qs = v.race.qs, n = qs.length, amHost = v.you === v.hostPid;
     const me = v.players.find(p => p.pid === v.you);
-    const bar = right => '<header class="bar"><span>' + (v.solo ? 'Solo quiz' : 'Room <b>' + esc(v.code) + '</b>') + '</span><span>' + right + '</span></header>';
-    const end = !v.solo && amHost ? '<button class="btn" data-act="skip">End the race now</button>' : '';
+    const end = !v.solo && amHost ? '<button class="btn" data-act="skip">' + t('End the race now') + '</button>' : '';
     if (!me || !me.racing) {
-      return bar('Timed quiz') + raceStripHTML() + '<main class="stage" id="race"><p class="status">A timed quiz is under way. You will be in the next game.</p><div class="action">' + end + '</div></main>';
+      return barHTML(t('Timed quiz')) + raceStripHTML() + '<main class="stage" id="race"><p class="status">' + t('A timed quiz is under way. You will be in the next game.') + '</p><div class="action">' + end + '</div></main>';
     }
     if (race.i >= n) {
-      return bar('Finished') + raceStripHTML() + '<main class="stage" id="race">' +
-        '<div class="q"><p>All done</p><h2>' + race.score + ' of ' + n + ' in ' + clock(race.ms) + '</h2></div>' +
-        '<p class="status">' + (v.solo ? '' : 'Waiting for the others to finish. Results appear when everyone is done.') + '</p><div class="action">' + end + '</div></main>';
+      return barHTML(t('Finished')) + raceStripHTML() + '<main class="stage" id="race">' +
+        '<div class="q"><p>' + t('All done') + '</p><h2>' + t('{0} of {1} in {2}', race.score, n, clock(race.ms)) + '</h2></div>' +
+        '<p class="status">' + (v.solo ? '' : t('Waiting for the others to finish. Results appear when everyone is done.')) + '</p><div class="action">' + end + '</div></main>';
     }
     const q = qs[race.i], picked = race.picked, done = picked !== null;
-    return bar('Question ' + (race.i + 1) + ' of ' + n + ' · <span id="clock">' + clock(race.ms + (done ? 0 : Date.now() - race.t0)) + '</span>') +
+    return barHTML(t('Question {0} of {1}', race.i + 1, n) + ' · <span id="clock">' + clock(race.ms + (done ? 0 : Date.now() - race.t0)) + '</span>') +
       raceStripHTML() + '<main class="stage" id="race">' + questionHTML(done ? q.options[q.truth] : null, q) +
-      '<p class="status">' + (!done ? 'Which one is true?' : picked === q.truth ? 'Correct!' : 'Not this time.') + '</p>' +
+      '<p class="status">' + (!done ? t('Which one is true?') : picked === q.truth ? t('Correct!') : t('Not this time.')) + '</p>' +
       '<div class="opts">' + q.options.map((o, i) => done
         ? '<div class="opt' + (i === q.truth ? ' truth' : i === picked ? ' trap' : '') + '">' + esc(o) +
-          (i === q.truth ? '<small><b>The truth</b>' + (i === picked ? ' · your pick' : '') + '</small>' : i === picked ? '<small>your pick</small>' : '') + '</div>'
+          (i === q.truth ? '<small><b>' + t('The truth') + '</b>' + (i === picked ? ' · ' + t('your pick') : '') + '</small>' : i === picked ? '<small>' + t('your pick') + '</small>' : '') + '</div>'
         : '<button class="opt" data-act="rpick" data-i="' + i + '">' + esc(o) + '</button>').join('') + '</div>' +
-      '<div class="action">' + (done ? '<button class="btn primary big" data-act="rnext">' + (race.i + 1 >= n ? 'Finish' : 'Next question') + '</button>' : '') + '</div></main>';
+      '<div class="action">' + (done ? '<button class="btn primary big" data-act="rnext">' + (race.i + 1 >= n ? t('Finish') : t('Next question')) + '</button>' : '') + '</div></main>';
   }
 
   function gameHTML() {
@@ -804,19 +903,19 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     if (v.phase === 'write') {
       const w = v.write;
       body = questionHTML();
-      if (w.role === 'watch') body += '<p class="status">This question is already going. You can vote when the answers are in.</p>';
+      if (w.role === 'watch') body += '<p class="status">' + t('This question is already going. You can vote when the answers are in.') + '</p>';
       else if (w.mine !== null) {
-        body += '<p class="status">Handed in. Waiting on ' + people(w.waiting) + '.</p>' +
-          '<p class="mine">' + (w.role === 'truth' ? 'Your truth' : w.canned ? 'Your ready-made lie (half points)' : 'Your lie') + ': <b>' + esc(w.mine) + '</b></p>';
+        body += '<p class="status">' + t('Handed in. Waiting on {0}.', people(w.waiting)) + '</p>' +
+          '<p class="mine">' + (w.role === 'truth' ? t('Your truth') : w.canned ? t('Your ready-made lie (half points)') : t('Your lie')) + ': <b>' + esc(w.mine) + '</b></p>';
       } else {
-        body += '<p class="status">' + (w.role === 'truth' ? 'Tell the truth. Everyone else is busy lying about you.' : q.kind === 'facts' ? 'Write a lie that sounds true.' : 'Make up an answer that sounds like ' + subject + '.') + '</p>' +
-          '<input id="answer" maxlength="' + MAX_LEN + '" autocomplete="off" placeholder="' + (w.role === 'truth' ? 'The honest answer' : 'Your most convincing lie') + '" value="' + esc(draft) + '">' +
+        body += '<p class="status">' + (w.role === 'truth' ? t('Tell the truth. Everyone else is busy lying about you.') : q.kind === 'facts' ? t('Write a lie that sounds true.') : t('Make up an answer that sounds like {0}.', subject)) + '</p>' +
+          '<input id="answer" maxlength="' + MAX_LEN + '" autocomplete="off" placeholder="' + (w.role === 'truth' ? t('The honest answer') : t('Your most convincing lie')) + '" value="' + esc(draft) + '">' +
           '<p class="err" id="nope">' + esc(nope) + '</p>' +
-          '<p class="tip">' + (w.role === 'truth' ? 'Keep it short. Your friends will have to pick it out from the lies.' : 'Keep it short and plausible. You score when friends pick it.') + '</p>';
-        action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? 'Lock in the truth' : 'Hand in my lie') + '</button>' +
-          (w.role === 'lie' && w.canSuggest ? '<button class="btn" data-act="canned">Give me a lie (half points)</button>' : '');
+          '<p class="tip">' + (w.role === 'truth' ? t('Keep it short. Your friends will have to pick it out from the lies.') : t('Keep it short and plausible. You score when friends pick it.')) + '</p>';
+        action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? t('Lock in the truth') : t('Hand in my lie')) + '</button>' +
+          (w.role === 'lie' && w.canSuggest ? '<button class="btn" data-act="canned">' + t('Give me a lie (half points)') + '</button>' : '');
       }
-      if (amHost && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">Carry on without them</button>';
+      if (amHost && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Carry on without them') + '</button>';
     } else {
       const m = v.vote, done = v.phase === 'reveal';
       const truth = done ? (m.options.find(o => o.truth) || {}).text : null;
@@ -825,33 +924,33 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       const right = m.myVote !== null && m.options[m.myVote] && m.options[m.myVote].truth;
       body = questionHTML(truth) +
         '<p class="status">' + (done
-            ? (v.solo ? (right ? 'Correct!' + (v.streak > 1 ? ' That is ' + v.streak + ' in a row.' : '') : 'Not this time.')
-              : q.kind === 'us' ? 'The truth about ' + (iAmSubject ? 'you' : subject) + '.' : 'The truth is out.')
-          : iAmSubject ? 'Your friends are working out which one is really you. Waiting on ' + people(m.waiting) + '.'
-          : canPick ? (quiz ? 'Which one is true?' : 'Which one is the truth?')
-          : 'Vote is in. Waiting on ' + people(m.waiting) + '.') + '</p>' +
+            ? (v.solo ? (right ? t('Correct!') + (v.streak > 1 ? t(' That is {0} in a row.', v.streak) : '') : t('Not this time.'))
+              : q.kind === 'us' ? (iAmSubject ? t('The truth about you.') : t('The truth about {0}.', subject)) : t('The truth is out.'))
+          : iAmSubject ? t('Your friends are working out which one is really you. Waiting on {0}.', people(m.waiting))
+          : canPick ? (quiz ? t('Which one is true?') : t('Which one is the truth?'))
+          : t('Vote is in. Waiting on {0}.', people(m.waiting))) + '</p>' +
         '<div class="opts">' + m.options.map((o, i) => {
           if (done) {
-            const who = o.truth ? '<b>The truth</b>' + (o.authors.length ? ' · ' + names(o.authors) + ' wrote it by accident' : '')
-              : o.house ? (quiz ? '' : '<b>A trap set by the game</b>')
-              : '<b>' + names(o.authors) + '\'s lie</b>' + (o.readyMade ? ' (ready-made)' : '');
-            const picked = v.solo ? (o.pickers.length ? 'your pick' : '')
-              : o.pickers.length ? (o.truth ? 'found by ' : o.house ? (quiz ? 'picked by ' : 'caught ') : 'fooled ') + names(o.pickers)
-              : o.truth ? 'nobody found it' : '';
+            const who = o.truth ? '<b>' + t('The truth') + '</b>' + (o.authors.length ? ' · ' + t('{0} wrote it by accident', names(o.authors)) : '')
+              : o.house ? (quiz ? '' : '<b>' + t('A trap set by the game') + '</b>')
+              : '<b>' + t('{0}\'s lie', names(o.authors)) + '</b>' + (o.readyMade ? t(' (ready-made)') : '');
+            const picked = v.solo ? (o.pickers.length ? t('your pick') : '')
+              : o.pickers.length ? t(o.truth ? 'found by {0}' : o.house ? (quiz ? 'picked by {0}' : 'caught {0}') : 'fooled {0}', names(o.pickers))
+              : o.truth ? t('nobody found it') : '';
             const note = [who, picked].filter(Boolean).join(' · ');
             return '<div class="opt' + (o.truth ? ' truth' : o.pickers.length && (o.house || v.solo) ? ' trap' : '') + '">' + esc(o.text) + (note ? '<small>' + note + '</small>' : '') + '</div>';
           }
           return '<button class="opt' + (m.myVote === i ? ' sel' : '') + '" data-act="vote" data-i="' + i + '"' + (canPick && !o.own ? '' : ' disabled') + '>' +
-            esc(o.text) + (o.own ? '<small>your lie</small>' : '') + '</button>';
+            esc(o.text) + (o.own ? '<small>' + t('your lie') + '</small>' : '') + '</button>';
         }).join('') + '</div>';
       if (done) {
         const got = v.players.filter(p => p.gain !== 0).sort((a, b) => b.gain - a.gain);
-        if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b class="' + (p.gain < 0 ? 'neg' : '') + '">' + (p.gain < 0 ? '−' : '+') + Math.abs(p.gain) + '</b></li>').join('') : '<li>Nobody scored. Impressive.</li>') + '</ul>';
-        if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? (v.solo ? 'See how you did' : 'See final scores') : 'Next question') + '</button>';
-      } else if (amHost && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">Show the answer now</button>';
+        if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b class="' + (p.gain < 0 ? 'neg' : '') + '">' + (p.gain < 0 ? '−' : '+') + Math.abs(p.gain) + '</b></li>').join('') : '<li>' + t('Nobody scored. Impressive.') + '</li>') + '</ul>';
+        if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? (v.solo ? t('See how you did') : t('See final scores')) : t('Next question')) + '</button>';
+      } else if (amHost && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Show the answer now') + '</button>';
     }
 
-    return '<header class="bar"><span>' + (v.solo ? 'Solo quiz' : 'Room <b>' + esc(v.code) + '</b>') + '</span><span>Question ' + v.round + ' of ' + v.rounds + '</span></header>' +
+    return barHTML(t('Question {0} of {1}', v.round, v.rounds)) +
       scoresHTML() + '<main class="stage">' + body + '<div class="action">' + action + '</div></main>';
   }
 
@@ -859,34 +958,34 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const v = view, amHost = v.you === v.hostPid;
     if (v.solo) {
       const score = v.players[0].score, pct = score / v.total, b = bestSolo();
-      return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">' + score + ' of ' + v.total + (v.raced ? ' in ' + clock(v.players[0].ms) : '') + '</div>' +
-        '<p class="note">' + (pct === 1 ? 'Flawless. Suspicious, even.' : pct >= 0.7 ? 'Sharp. The facts are worried.' : pct >= 0.4 ? 'Respectable. The facts put up a fight.' : 'The facts win this one.') +
-        (b ? ' Your best is ' + bestText(b) + '.' : '') + '</p>' +
-        '<button class="btn primary big" data-act="start">Play again</button>' +
-        '<button class="btn" data-act="lobby">Change packs</button><button class="btn" data-act="leave">Back to the start</button></main>';
+      return '<main class="lobby"><p class="eyebrow">' + t('Solo quiz') + '</p><div class="code small">' + (v.raced ? t('{0} of {1} in {2}', score, v.total, clock(v.players[0].ms)) : t('{0} of {1}', score, v.total)) + '</div>' +
+        '<p class="note">' + (pct === 1 ? t('Flawless. Suspicious, even.') : pct >= 0.7 ? t('Sharp. The facts are worried.') : pct >= 0.4 ? t('Respectable. The facts put up a fight.') : t('The facts win this one.')) +
+        (b ? t(' Your best is {0}.', bestText(b)) : '') + '</p>' +
+        '<button class="btn primary big" data-act="start">' + t('Play again') + '</button>' +
+        '<button class="btn" data-act="lobby">' + t('Change packs') + '</button><button class="btn" data-act="leave">' + t('Back to the start') + '</button></main>';
     }
     // A timed quiz ranks by score, then by the faster time. Only the people who raced are listed.
     const tied = (a, b) => a.score === b.score && (!v.raced || a.ms === b.ms);
     const ranked = v.players.filter(p => !v.raced || p.racing).sort((a, b) => b.score - a.score || (v.raced ? a.ms - b.ms : 0));
     // Everyone level at the top shares the win, and equal results share a place.
     const winners = ranked.filter(p => tied(p, ranked[0])).map(p => esc(p.name));
-    const headline = winners.length === 1 ? winners[0] + ' wins'
-      : (winners.length === ranked.length && ranked.length > 2) ? 'Everyone ties'
-      : winners.slice(0, -1).join(', ') + ' and ' + winners[winners.length - 1] + ' tie';
+    const headline = winners.length === 1 ? t('{0} wins', winners[0])
+      : (winners.length === ranked.length && ranked.length > 2) ? t('Everyone ties')
+      : t('{0} and {1} tie', winners.slice(0, -1).join(', '), winners[winners.length - 1]);
     const place = p => ranked.findIndex(x => tied(x, p)) + 1;
-    return '<main class="lobby"><p class="eyebrow">' + (v.raced ? 'Fastest brain' : v.mode === 'quiz' ? 'Top of the class' : 'Best liar') + '</p><div class="code small">' + headline + '</div>' +
+    return '<main class="lobby"><p class="eyebrow">' + (v.raced ? t('Fastest brain') : v.mode === 'quiz' ? t('Top of the class') : t('Best liar')) + '</p><div class="code small">' + headline + '</div>' +
       '<ul class="plist rank">' + ranked.map(p =>
-        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + (v.raced ? '/' + v.total + ' · ' + (p.rdone ? clock(p.ms) : 'did not finish') : '') + '</b></li>').join('') + '</ul>' +
+        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + (v.raced ? '/' + v.total + ' · ' + (p.rdone ? clock(p.ms) : t('did not finish')) : '') + '</b></li>').join('') + '</ul>' +
       (amHost
-        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < needPlayers(v.mode, v.solo) ? ' disabled' : '') + '>Play again</button>' +
-          '<button class="btn" data-act="lobby">Back to lobby</button>'
-        : '<p class="note">Waiting for the host to start another game.</p>') + '</main>';
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < needPlayers(v.mode, v.solo) ? ' disabled' : '') + '>' + t('Play again') + '</button>' +
+          '<button class="btn" data-act="lobby">' + t('Back to lobby') + '</button>'
+        : '<p class="note">' + t('Waiting for the host to start another game.') + '</p>') + '</main>';
   }
 
   /* ---------------- EVENTS ---------------- */
   function readName() {
     myName = myName.trim().slice(0, 16);
-    if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
+    if (!myName) { homeErr = t('Pick a name first.'); render(); return false; }
     save('localStorage', 'bfl_name', myName); homeErr = '';
     return true;
   }
@@ -919,21 +1018,25 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function go(a, el) {
     switch (a) {
       case 'create':
-        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (typeof Peer === 'undefined') { homeErr = t('The connection library did not load. Refresh the page.'); render(); return; }
         if (readName()) createRoom();
         break;
       case 'join':
-        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (typeof Peer === 'undefined') { homeErr = t('The connection library did not load. Refresh the page.'); render(); return; }
         if (!readName()) return;
-        if (roomCode.length !== 5) { homeErr = 'Room codes are 5 letters.'; render(); return; }
+        if (roomCode.length !== 5) { homeErr = t('Room codes are 5 letters.'); render(); return; }
         joinRoom(roomCode);
         break;
       case 'copy': {
         const url = shareUrl();
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'), () => prompt('Copy this link:', url));
-        else prompt('Copy this link:', url);
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast(t('Invite link copied.')), () => prompt(t('Copy this link:'), url));
+        else prompt(t('Copy this link:'), url);
         break;
       }
+      case 'lang':                              // on the start screen it is my own choice; in a room it is the host's
+        if (view) act({ t: 'lang', lang: el.dataset.l });
+        else if (DATA[el.dataset.l]) { uiLang = el.dataset.l; save('localStorage', 'bfl_lang', uiLang); homeErr = ''; render(); }
+        break;
       case 'start': act({ t: 'start' }); break;
       case 'lobby': act({ t: 'lobby' }); break;
       case 'solo': startSolo(); break;
@@ -958,7 +1061,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'skip': act({ t: 'skip' }); break;
       case 'next': act({ t: 'next' }); break;
       case 'reconnect':
-        toast('Reconnecting…');
+        toast(t('Reconnecting…'));
         if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
         if (peer && !peer.destroyed) connectHost();
         break;

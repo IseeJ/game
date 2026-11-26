@@ -683,7 +683,6 @@ const MED = [
   ['The antidote for a paracetamol (acetaminophen) overdose is _____.', 'N-acetylcysteine', 'acetylcysteine', 'NAC', 'n acetylcysteine', 'parvolex', ['naloxone', 'flumazenil', 'atropine']],
   ['The antidote for warfarin is vitamin _____.', 'K', ['C', 'B12', 'E']],
   ['Methanol poisoning can be treated by giving the patient _____.', 'ethanol', 'alcohol', 'vodka', 'whisky', 'whiskey', ['milk', 'vinegar', 'olive oil']],
-  ['Grapefruit juice interferes with dozens of drugs by blocking a gut enzyme called CYP_____.', '3A4', ['2D6', '2C9', '1A2']],
   ['The antibiotic rifampicin turns urine, sweat and tears _____.', 'orange', 'red', 'orange-red', 'orange red', ['blue', 'green', 'black']],
   ['"Placebo" is Latin for "I shall _____".', 'please', ['pretend', 'heal', 'deceive']],
   ['When a dummy pill makes people feel worse because they expect side effects, it is called the _____ effect.', 'nocebo', ['malcebo', 'reverse placebo', 'Pavlov']],
