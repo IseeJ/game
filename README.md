@@ -1,2 +1,1 @@
-test
-personal use only
+personal use only!
