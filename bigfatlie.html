@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Big Fat Lie — write a lie, spot the truth</title>
+<meta name="description" content="Everyone invents a fake answer. The real one is hiding among them. Fool your friends and find the truth. Play with a room code.">
+<style>
+:root {
+  --bg: #f6f3ed;
+  --panel: #ece7de;
+  --field: #fcfbf8;
+  --line: #d8d1c4;
+  --ink: #23211e;
+  --dim: #7a7368;
+  --accent: #2c6e68;
+  --truth: #2f9b65;
+  --lie: #b4532f;
+  --radius: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", Thonburi, Tahoma, sans-serif;
+  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.btn {
+  appearance: none; border: 2px solid var(--line); background: transparent;
+  font-weight: 700; padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  transition: transform .08s, border-color .15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.1); }
+.btn.big { padding: 14px 24px; font-size: 1.05rem; }
+.btn.small { padding: 6px 14px; font-size: .9rem; }
+.field { display: block; text-align: left; margin: 0 0 14px; }
+.field span { display: block; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 6px; }
+.field.inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.field.inline span { margin: 0; }
+input, select { width: 100%; background: var(--field); border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
+select { width: auto; }
+input::placeholder { color: #aaa397; font-weight: 400; }
+
+.home, .lobby { max-width: 420px; margin: 0 auto; padding: 44px 20px 40px; display: flex; flex-direction: column; gap: 12px; }
+.logo { font-size: clamp(3.2rem, 17vw, 4.8rem); line-height: .9; letter-spacing: -.04em; margin: 0; font-weight: 900; }
+.logo i { font-style: normal; color: var(--lie); text-decoration: line-through; text-decoration-thickness: .08em; }
+.tag { color: var(--dim); margin: 8px 0 18px; font-size: 1.05rem; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: .85rem; margin: 6px 0; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.joinrow { display: flex; gap: 10px; }
+.joinrow input { text-transform: uppercase; letter-spacing: .3em; font-size: 1.15rem; text-align: center; min-width: 0; }
+.joinrow input::placeholder { letter-spacing: normal; }
+.joinrow .btn { flex: none; }
+.note { color: var(--dim); margin: 8px 0 0; }
+.err { color: #a3261c; font-weight: 700; margin: 8px 0 0; }
+.fine { color: var(--dim); font-size: .85rem; margin: 14px 0 0; }
+.how { margin: 18px 0 0; padding: 0 0 0 20px; color: var(--dim); font-size: .92rem; }
+.how li { margin-bottom: 5px; }
+.lobby { text-align: center; align-items: center; }
+.lobby > * { width: 100%; }
+.lobby > .btn.small { width: auto; }
+.eyebrow { margin: 0; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+.code { font-size: clamp(3rem, 16vw, 4.4rem); font-weight: 900; letter-spacing: .12em; color: var(--accent); line-height: 1.05; }
+.code.small { font-size: 2rem; letter-spacing: 0; line-height: 1.2; }
+.lobby h2 { margin: 20px 0 0; font-size: 1.1rem; text-align: left; }
+.dim { color: var(--dim); font-weight: 400; }
+.plist { list-style: none; margin: 0 0 14px; padding: 0; text-align: left; }
+.plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
+.plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
+.plist.rank li { display: flex; justify-content: space-between; }
+.plist.rank li.top { background: var(--accent); color: #fff; }
+
+.bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
+.bar b { color: var(--accent); letter-spacing: .1em; }
+.scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
+.scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 2px solid transparent; border-radius: 999px; padding: 5px 7px 5px 13px; font-size: .9rem; }
+.scores li.me .nm { text-decoration: underline; text-underline-offset: 3px; }
+.scores li.star { border-color: var(--accent); }
+.scores li.off { opacity: .4; }
+.scores .mk { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); font-weight: 700; }
+.scores b { background: var(--bg); border-radius: 999px; min-width: 26px; text-align: center; padding: 2px 6px; }
+
+.stage { max-width: 600px; margin: 0 auto; padding: 8px 20px 130px; }
+.q { background: var(--ink); color: var(--bg); border-radius: var(--radius); padding: 20px 18px; }
+.q p { margin: 0; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; opacity: .65; }
+.q h2 { margin: 6px 0 0; font-size: 1.4rem; line-height: 1.3; font-weight: 700; }
+.q .blank { display: inline-block; width: 4.5em; border-bottom: 3px solid currentColor; }
+.q mark { background: var(--truth); color: #fff; padding: 0 .25em; border-radius: 5px; }
+.status { margin: 16px 0 0; font-size: 1.1rem; font-weight: 700; }
+.tip { margin: 6px 0 0; color: var(--dim); font-size: .92rem; }
+#answer { margin-top: 14px; font-size: 1.1rem; }
+.mine { margin: 14px 0 0; padding: 12px 14px; background: var(--panel); border-radius: 12px; }
+.mine b { text-transform: uppercase; }
+.opts { display: grid; gap: 10px; margin: 16px 0 0; }
+.opt {
+  appearance: none; display: block; width: 100%; text-align: left;
+  background: var(--field); border: 2px solid var(--line); border-radius: var(--radius);
+  padding: 15px 16px; font-weight: 800; font-size: 1.1rem; text-transform: uppercase; letter-spacing: .01em;
+}
+button.opt { cursor: pointer; transition: transform .08s, border-color .15s; }
+button.opt:hover:not(:disabled) { border-color: var(--ink); transform: translateY(-2px); }
+button.opt:disabled { cursor: not-allowed; opacity: .5; }
+.opt.sel { border-color: var(--accent); background: var(--panel); opacity: 1 !important; }
+.opt.truth { border-color: var(--truth); box-shadow: inset 0 0 0 1px var(--truth); }
+.opt small { display: block; margin-top: 6px; font-size: .8rem; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--dim); }
+.opt small b { color: var(--lie); }
+.opt.truth small b { color: var(--truth); }
+.gains { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.gains li { background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: .9rem; font-weight: 700; }
+.gains li b { color: var(--accent); }
+.action { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 799px) {
+  .action:not(:empty) { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--bg) 30%); z-index: 5; }
+  .action .btn { flex: 1; }
+}
+
+.overlay { position: fixed; inset: 0; background: rgba(35, 33, 30, .55); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--bg); border-radius: var(--radius); padding: 24px; max-width: 380px; }
+.dialog h2 { margin: 0 0 8px; }
+.dialog p { color: var(--dim); margin: 0 0 18px; }
+#toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- PeerJS: browser-to-browser connections, no server of your own needed -->
+<script src="bfl.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+
+// Two answers count as the same if they match once case, punctuation and "a/an/the" are ignored.
+const tidy = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ').replace(/\b(a|an|the)\b/g, ' ').replace(/\s+/g, ' ').trim();
+const FIND = 2;   // points for picking the truth
+const FOOL = 1;   // points for each friend who picks your lie
+const KNOWN = 1;  
+
+
+(() => {
+  'use strict';
+
+  const PREFIX = 'bigfatlie-v1-';
+  const MAX_LEN = 60;
+  const MIN_PLAYERS = 3, MAX_PLAYERS = 10;
+  const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const MODES = { mix: 'A bit of both', facts: 'Weird facts', us: 'About us' };
+
+  const $app = document.getElementById('app'), $toast = document.getElementById('toast');
+  const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
+  const save = (store, k, v) => { try { window[store].setItem(k, v); } catch (e) {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const makeCode = () => Array.from({ length: 5 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
+  const cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+  const cleanText = s => String(s || '').replace(/\s+/g, ' ').trim().slice(0, MAX_LEN).replace(/[.\s]+$/, '');
+
+  let myPid = load('sessionStorage', 'bfl_pid');
+  if (!myPid) { myPid = Math.random().toString(36).slice(2, 12); save('sessionStorage', 'bfl_pid', myPid); }
+  let myName = load('localStorage', 'bfl_name') || '';
+  let roomCode = cleanCode(new URLSearchParams(location.search).get('room'));
+
+  let peer = null, hostConn = null, isHost = false;
+  let G = null;        // full game state (host only)
+  let view = null;     // what this player is allowed to see
+  let busy = '', homeErr = '', lost = false, joinTimer = null;
+  let draft = '', nope = '', selKey = '';
+
+  /* ---------------- HOST ---------------- */
+  const P = pid => G.players.find(p => p.pid === pid);
+  const isLive = pid => { const p = P(pid); return !!(p && p.connected); };
+
+  function createRoom() {
+    isHost = true;
+    const code = makeCode();
+    busy = 'Creating room…'; render();
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      busy = ''; roomCode = code;
+      G = {
+        code, phase: 'lobby', rounds: 8, mode: load('localStorage', 'bfl_mode') in MODES ? load('localStorage', 'bfl_mode') : 'mix',
+        round: 0, hostPid: myPid,
+        players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
+        q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, lastSubject: null
+      };
+      setRoomUrl(code);
+      sync();
+    });
+    peer.on('connection', conn => {
+      conn.on('data', msg => {
+        if (!G || !msg || typeof msg !== 'object') return;
+        if (msg.t === 'join') hostJoin(conn, msg);
+        else if (conn.pid) handle(conn.pid, msg);
+      });
+      conn.on('close', () => hostLeave(conn));
+      conn.on('error', () => hostLeave(conn));
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
+      else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function hostJoin(conn, msg) {
+    const pid = String(msg.pid || '').slice(0, 20);
+    const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
+    if (!pid) return;
+    let p = P(pid);
+    if (p) {                                   // same player coming back
+      if (p.pid === G.hostPid) return;
+      const old = p.conn;
+      p.conn = conn; p.connected = true; p.name = name;
+      if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    } else {
+      if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
+      G.players.push({ pid, name, score: 0, gain: 0, conn, connected: true });
+    }
+    conn.pid = pid;
+    sync();
+  }
+
+  function hostLeave(conn) {
+    if (!G || !conn.pid) return;
+    const p = P(conn.pid);
+    if (!p || p.conn !== conn) return;
+    p.conn = null; p.connected = false;
+    if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
+    if (G.phase === 'write' && G.q.subject === p.pid && !G.subs[p.pid]) {
+      toastAll(p.name + ' left before telling the truth. Next question.');
+      G.round--; startRound(); return;
+    }
+    if (G.phase === 'write') maybeVote();
+    else if (G.phase === 'vote') maybeReveal();
+    sync();
+  }
+
+  function draw(kind, list) {
+    if (!G.decks[kind].length) G.decks[kind] = shuffle(list.map((x, i) => i));
+    return list[G.decks[kind].pop()];
+  }
+
+  function startGame() {
+    G.players = G.players.filter(p => p.connected);
+    G.players.forEach(p => { p.score = 0; p.gain = 0; });
+    G.round = 0; G.lastSubject = null;
+    startRound();
+  }
+
+  function startRound() {
+    const live = G.players.filter(p => p.connected);
+    if (live.length < MIN_PLAYERS) {
+      G.phase = 'lobby'; G.players = live;
+      toastAll('Not enough players left. Back to the lobby.');
+      sync(); return;
+    }
+    G.round++;
+    const kind = G.mode === 'mix' ? (G.round % 2 ? 'facts' : 'us') : G.mode;
+    if (kind === 'facts') {
+      const f = draw('facts', FACTS);
+      G.q = { kind, text: f[0], truths: f.slice(1), subject: null };
+    } else {
+      const n = G.players.length, cur = G.players.findIndex(p => p.pid === G.lastSubject);   // the next friend in turn
+      let subject = live[0];
+      for (let i = 1; i <= n; i++) { const c = G.players[(cur + i + n) % n]; if (c.connected) { subject = c; break; } }
+      G.lastSubject = subject.pid;
+      const a = draw('us', ABOUT);
+      G.q = { kind, you: a[0], them: a[1], truths: [], subject: subject.pid };
+    }
+    G.writers = live.map(p => p.pid);
+    G.subs = {}; G.options = []; G.votes = {};
+    G.players.forEach(p => { p.gain = 0; });
+    G.phase = 'write';
+    sync();
+  }
+
+  const isTruth = text => G.q.truths.some(t => tidy(t) === tidy(text));
+
+  function maybeVote() {
+    if (G.phase !== 'write') return;
+    if (!G.writers.filter(isLive).every(pid => G.subs[pid])) return;
+    if (G.q.kind === 'us') G.q.truths = [G.subs[G.q.subject]];
+    // The truth, plus every lie. Identical lies become one answer with several authors.
+    const opts = [{ text: G.q.truths[0], truth: true, authors: [] }];
+    G.writers.forEach(pid => {
+      const text = G.subs[pid];
+      if (!text || pid === G.q.subject) return;
+      if (isTruth(text)) { opts[0].authors.push(pid); return; }          // stumbled on the truth: no lie to show
+      const same = opts.find(o => !o.truth && tidy(o.text) === tidy(text));
+      if (same) same.authors.push(pid); else opts.push({ text, truth: false, authors: [pid] });
+    });
+    G.options = shuffle(opts);
+    G.phase = 'vote';
+    maybeReveal();
+  }
+
+  const voters = () => G.players.filter(p => p.connected && p.pid !== G.q.subject);
+
+  function maybeReveal() {
+    if (G.phase !== 'vote') return;
+    const v = voters();
+    if (v.length && !v.every(p => G.votes[p.pid] !== undefined)) return;
+    reveal();
+  }
+
+  function reveal() {
+    const add = (pid, n) => { const p = P(pid); if (p) { p.score += n; p.gain += n; } };
+    Object.keys(G.votes).forEach(pid => {
+      const o = G.options[G.votes[pid]];
+      if (o.truth) { add(pid, FIND); if (G.q.subject) add(G.q.subject, KNOWN); }
+      else o.authors.forEach(a => add(a, FOOL));
+    });
+    G.phase = 'reveal';
+  }
+
+  // Every player action lands here (the host's own actions too).
+  function handle(pid, msg) {
+    const p = P(pid);
+    if (!p) return;
+    const amHost = pid === G.hostPid;
+    switch (msg.t) {
+      case 'rounds':
+        if (amHost && G.phase === 'lobby') { G.rounds = Math.min(30, Math.max(3, parseInt(msg.rounds, 10) || 8)); sync(); }
+        break;
+      case 'mode':
+        if (amHost && G.phase === 'lobby' && msg.mode in MODES) { G.mode = msg.mode; sync(); }
+        break;
+      case 'start':
+        if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
+            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+        break;
+      case 'write': {
+        const text = cleanText(msg.text);
+        if (G.phase !== 'write' || !G.writers.includes(pid) || G.subs[pid] || !text) return;
+        if (G.q.kind === 'facts' && isTruth(text)) { tell(pid, { t: 'nope' }); return; }   // they wrote the real answer
+        G.subs[pid] = text;
+        maybeVote();
+        sync();
+        break;
+      }
+      case 'vote': {
+        const o = G.phase === 'vote' && G.options[msg.i];
+        if (!o || pid === G.q.subject || o.authors.includes(pid) && !o.truth || G.votes[pid] !== undefined) return;
+        G.votes[pid] = msg.i;
+        maybeReveal();
+        sync();
+        break;
+      }
+      case 'skip':                              // don't wait for stragglers
+        if (!amHost) return;
+        if (G.phase === 'write' && (G.q.kind === 'facts' || G.subs[G.q.subject])) {
+          G.writers = G.writers.filter(w => G.subs[w]); maybeVote(); sync();
+        } else if (G.phase === 'vote') { reveal(); sync(); }
+        break;
+      case 'next':
+        if (G.phase !== 'reveal' || !(amHost || pid === G.q.subject)) return;
+        if (G.round >= G.rounds) { G.phase = 'gameover'; sync(); }
+        else startRound();
+        break;
+      case 'lobby':
+        if (amHost && G.phase === 'gameover') {
+          G.players = G.players.filter(x => x.connected);
+          G.players.forEach(x => { x.score = 0; });
+          G.phase = 'lobby'; sync();
+        }
+        break;
+    }
+  }
+
+  function viewFor(pid) {
+    const ph = G.phase, q = G.q;
+    const v = {
+      code: G.code, phase: ph, rounds: G.rounds, mode: G.mode, round: G.round, you: pid, hostPid: G.hostPid,
+      players: G.players.map(p => ({
+        pid: p.pid, name: p.name, score: p.score, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0,
+        done: ph === 'write' ? (!!G.subs[p.pid] || !G.writers.includes(p.pid)) : ph === 'vote' ? (G.votes[p.pid] !== undefined || p.pid === q.subject) : false
+      }))
+    };
+    if (ph === 'lobby' || ph === 'gameover' || !q) return v;
+    const subject = q.subject ? P(q.subject) : null;
+    v.q = {
+      kind: q.kind, subjectPid: q.subject,
+      text: q.kind === 'facts' ? q.text : pid === q.subject ? q.you : q.them.replace('{name}', subject ? subject.name : 'them')
+    };
+    if (ph === 'write') {
+      v.write = {
+        role: !G.writers.includes(pid) ? 'watch' : pid === q.subject ? 'truth' : 'lie',
+        mine: G.subs[pid] || null,
+        waiting: G.writers.filter(w => isLive(w) && !G.subs[w]).length
+      };
+    } else {
+      const open = ph === 'reveal';
+      v.vote = {
+        myVote: G.votes[pid] === undefined ? null : G.votes[pid],
+        waiting: voters().filter(p => G.votes[p.pid] === undefined).length,
+        last: G.round >= G.rounds,
+        options: G.options.map((o, i) => ({
+          text: o.text, own: !o.truth && o.authors.includes(pid),
+          truth: open ? o.truth : false, authors: open ? o.authors : [],
+          pickers: open ? Object.keys(G.votes).filter(k => G.votes[k] === i) : []
+        }))
+      };
+    }
+    return v;
+  }
+
+  function sync() {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'state', v: viewFor(p.pid) }); } catch (e) {} } });
+    view = viewFor(myPid);
+    render();
+  }
+
+  function tell(pid, msg) {                     // a private message to one player
+    if (pid === myPid) { onMsg(msg); return; }
+    const p = P(pid);
+    if (p && p.conn && p.conn.open) { try { p.conn.send(msg); } catch (e) {} }
+  }
+
+  function toastAll(text) {
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', text }); } catch (e) {} } });
+    toast(text);
+  }
+
+  /* ---------------- GUEST ---------------- */
+  function joinRoom(code) {
+    isHost = false; roomCode = code;
+    busy = 'Joining ' + code + '…'; render();
+    peer = new Peer();
+    joinTimer = setTimeout(() => joinFail('Could not find that room. Check the code and make sure the host still has the game open.'), 15000);
+    peer.on('open', () => connectHost());
+    peer.on('error', err => {
+      if (err.type === 'peer-unavailable') { if (view) { lost = true; render(true); } else joinFail('No room with that code. Check it and try again.'); }
+      else if (!view) joinFail('Connection problem. Check your internet and try again.');
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  function connectHost() {
+    const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+    hostConn = conn;
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('data', msg => {
+      if (!msg || conn !== hostConn) return;
+      if (msg.t === 'state') {
+        clearTimeout(joinTimer); busy = ''; const was = lost; lost = false;
+        if (!view) setRoomUrl(roomCode);
+        view = msg.v; render(was);
+      } else if (msg.t === 'full') joinFail('That room is full.');
+      else onMsg(msg);
+    });
+    conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(true); } });
+  }
+
+  function onMsg(msg) {
+    if (msg.t === 'toast') toast(msg.text);
+    else if (msg.t === 'nope') {                // I typed the real answer by accident
+      nope = 'That is the real answer! Write a lie instead.';
+      const el = document.getElementById('nope'); if (el) el.textContent = nope;
+    }
+  }
+
+  function joinFail(text) {
+    clearTimeout(joinTimer);
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
+    render();
+  }
+
+  function act(msg) {
+    if (isHost) handle(myPid, msg);
+    else if (hostConn && hostConn.open) hostConn.send(msg);
+  }
+
+  /* ---------------- RENDERING ---------------- */
+  function setRoomUrl(code) { try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {} }
+  const shareUrl = () => location.origin + location.pathname + '?room=' + view.code;
+
+  let toastTimer = null;
+  function toast(text) {
+    $toast.textContent = text; $toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 3500);
+  }
+
+  const people = n => n + ' more ' + (n === 1 ? 'person' : 'people');
+
+  function render(force) {
+    if (!view) { $app.innerHTML = homeHTML(); return; }
+    const key = view.round + ':' + view.phase + ':' + (view.q ? view.q.text : '');   // a replaced question counts as new
+    const same = key === selKey;
+    if (!same) { selKey = key; draft = ''; nope = ''; }
+    // Someone else handing in must not wipe what a player is typing:
+    // while I am still writing, only the score strip is refreshed.
+    if (same && !force && view.write && view.write.mine === null && document.getElementById('answer')) {
+      const s = $app.querySelector('.scores');
+      if (s) s.outerHTML = scoresHTML();
+      return;
+    }
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    if (lost) {
+      html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2><p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
+        '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button><button class="btn" data-act="leave">Leave</button></div></div></div>';
+    }
+    $app.innerHTML = html;
+    const box = document.getElementById('answer');
+    if (box && !same) box.focus();
+  }
+
+  function homeHTML() {
+    const dis = busy ? ' disabled' : '';
+    return '<main class="home">' +
+      '<h1 class="logo">Big Fat<br><i>Truth</i> Lie.</h1>' +
+      '<p class="tag">Write a lie. Spot the truth. Fool your friends.</p>' +
+      '<label class="field"><span>Your name</span><input id="name" maxlength="16" autocomplete="off" placeholder="e.g. Sam" value="' + esc(myName) + '"' + dis + '></label>' +
+      '<button class="btn primary big" data-act="create"' + dis + '>Create a room</button>' +
+      '<div class="or"><span>or join with a code</span></div>' +
+      '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Room code" value="' + esc(roomCode) + '"' + dis + '>' +
+      '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
+      (busy ? '<p class="note">' + esc(busy) + '</p>' : '') + (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
+      '<ol class="how"><li>A strange fact comes up with the answer missing. Everyone types a believable lie.</li>' +
+      '<li>All the lies appear on every screen, with the real answer hidden among them. Pick the one you think is true.</li>' +
+      '<li>' + FIND + ' points for finding the truth, and ' + FOOL + ' for every friend who falls for your lie.</li>' +
+      '<li>In "About us" rounds the question is about one of you. They tell the truth and everyone else lies about them.</li></ol>'
+      '</main>';
+  }
+
+  function lobbyHTML() {
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const rounds = [5, 8, 10, 15, 20].map(g => '<option value="' + g + '"' + (g === v.rounds ? ' selected' : '') + '>' + g + '</option>').join('');
+    const modes = Object.keys(MODES).map(k => '<option value="' + k + '"' + (k === v.mode ? ' selected' : '') + '>' + MODES[k] + '</option>').join('');
+    return '<main class="lobby">' +
+      '<p class="eyebrow">Room code</p><div class="code">' + esc(v.code) + '</div>' +
+      '<button class="btn small" data-act="copy">Copy invite link</button>' +
+      '<h2>Players <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
+      '<ul class="plist">' + v.players.map(p => '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
+      (amHost
+        ? '<label class="field inline"><span>Questions</span><select id="mode">' + modes + '</select></label>' +
+          '<label class="field inline"><span>How many</span><select id="rounds">' + rounds + '</select></label>' +
+          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
+          (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
+          '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
+        : '<p class="note">Waiting for the host to start. ' + v.rounds + ' questions: ' + MODES[v.mode].toLowerCase() + '.</p>') +
+      '</main>';
+  }
+
+  function scoresHTML() {
+    const v = view, subject = v.q ? v.q.subjectPid : null;
+    return '<ul class="scores">' + v.players.map(p =>
+      '<li class="' + (p.pid === subject ? 'star ' : '') + (p.connected ? '' : 'off ') + (p.pid === v.you ? 'me' : '') + '">' +
+      '<span class="nm">' + esc(p.name) + '</span>' + (v.phase !== 'reveal' && p.done ? '<span class="mk">✓</span>' : '') +
+      '<b>' + p.score + '</b></li>').join('') + '</ul>';
+  }
+
+  // The question card. A fact shows its gap, or the truth once it is revealed.
+  function questionHTML(truth) {
+    const q = view.q;
+    const label = q.kind === 'facts' ? 'Weird fact' : 'About ' + (q.subjectPid === view.you ? 'you' : esc(nameOf(q.subjectPid)));
+    const text = q.kind === 'facts'
+      ? esc(q.text).replace('_____', truth ? '<mark>' + esc(truth) + '</mark>' : '<span class="blank"></span>')
+      : esc(q.text);
+    return '<div class="q"><p>' + label + '</p><h2>' + text + '</h2></div>';
+  }
+  const nameOf = pid => { const p = view.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+
+  function gameHTML() {
+    const v = view, amHost = v.you === v.hostPid, q = v.q;
+    const iAmSubject = q.subjectPid === v.you, subject = q.subjectPid ? esc(nameOf(q.subjectPid)) : '';
+    let body = '', action = '';
+
+    if (v.phase === 'write') {
+      const w = v.write;
+      body = questionHTML();
+      if (w.role === 'watch') body += '<p class="status">This question is already going. You can vote when the answers are in.</p>';
+      else if (w.mine !== null) {
+        body += '<p class="status">Handed in. Waiting on ' + people(w.waiting) + '.</p>' +
+          '<p class="mine">' + (w.role === 'truth' ? 'Your truth' : 'Your lie') + ': <b>' + esc(w.mine) + '</b></p>';
+      } else {
+        body += '<p class="status">' + (w.role === 'truth' ? 'Tell the truth. Everyone else is busy lying about you.' : q.kind === 'facts' ? 'Write a lie that sounds true.' : 'Make up an answer that sounds like ' + subject + '.') + '</p>' +
+          '<input id="answer" maxlength="' + MAX_LEN + '" autocomplete="off" placeholder="' + (w.role === 'truth' ? 'The honest answer' : 'Your most convincing lie') + '" value="' + esc(draft) + '">' +
+          '<p class="err" id="nope">' + esc(nope) + '</p>' +
+          '<p class="tip">' + (w.role === 'truth' ? 'Keep it short. Your friends will have to pick it out from the lies.' : 'Keep it short and plausible. You score when friends pick it.') + '</p>';
+        action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? 'Lock in the truth' : 'Hand in my lie') + '</button>';
+      }
+      if (amHost && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">Carry on without them</button>';
+    } else {
+      const m = v.vote, done = v.phase === 'reveal';
+      const truth = done ? (m.options.find(o => o.truth) || {}).text : null;
+      const canPick = !done && !iAmSubject && m.myVote === null;
+      const names = list => list.map(p => esc(nameOf(p))).join(', ');
+      body = questionHTML(truth) +
+        '<p class="status">' + (done ? (q.kind === 'facts' ? 'The truth is out.' : 'The truth about ' + (iAmSubject ? 'you' : subject) + '.')
+          : iAmSubject ? 'Your friends are working out which one is really you. Waiting on ' + people(m.waiting) + '.'
+          : canPick ? 'Which one is the truth?'
+          : 'Vote is in. Waiting on ' + people(m.waiting) + '.') + '</p>' +
+        '<div class="opts">' + m.options.map((o, i) => {
+          if (done) {
+            const who = o.truth ? '<b>The truth</b>' + (o.authors.length ? ' · ' + names(o.authors) + ' wrote it by accident' : '')
+              : '<b>' + names(o.authors) + '\'s lie</b>';
+            const picked = o.pickers.length ? (o.truth ? ' · found by ' : ' · fooled ') + names(o.pickers) : o.truth ? ' · nobody found it' : '';
+            return '<div class="opt' + (o.truth ? ' truth' : '') + '">' + esc(o.text) + '<small>' + who + picked + '</small></div>';
+          }
+          return '<button class="opt' + (m.myVote === i ? ' sel' : '') + '" data-act="vote" data-i="' + i + '"' + (canPick && !o.own ? '' : ' disabled') + '>' +
+            esc(o.text) + (o.own ? '<small>your lie</small>' : '') + '</button>';
+        }).join('') + '</div>';
+      if (done) {
+        const got = v.players.filter(p => p.gain > 0).sort((a, b) => b.gain - a.gain);
+        body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b>+' + p.gain + '</b></li>').join('') : '<li>Nobody scored. Impressive.</li>') + '</ul>';
+        if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? 'See final scores' : 'Next question') + '</button>';
+      } else if (amHost && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">Show the answer now</button>';
+    }
+
+    return '<header class="bar"><span>Room <b>' + esc(v.code) + '</b></span><span>Question ' + v.round + ' of ' + v.rounds + '</span></header>' +
+      scoresHTML() + '<main class="stage">' + body + '<div class="action">' + action + '</div></main>';
+  }
+
+  function overHTML() {
+    const v = view, amHost = v.you === v.hostPid;
+    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
+    // Everyone on the top score shares the win, and equal scores share a place.
+    const winners = ranked.filter(p => p.score === ranked[0].score).map(p => esc(p.name));
+    const headline = winners.length === 1 ? winners[0] + ' wins'
+      : (winners.length === ranked.length && ranked.length > 2) ? 'Everyone ties'
+      : winners.slice(0, -1).join(', ') + ' and ' + winners[winners.length - 1] + ' tie';
+    const place = p => ranked.findIndex(x => x.score === p.score) + 1;
+    return '<main class="lobby"><p class="eyebrow">Best liar</p><div class="code small">' + headline + '</div>' +
+      '<ul class="plist rank">' + ranked.map(p =>
+        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+      (amHost
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
+          '<button class="btn" data-act="lobby">Back to lobby</button>'
+        : '<p class="note">Waiting for the host to start another game.</p>') + '</main>';
+  }
+
+  /* ---------------- EVENTS ---------------- */
+  function readName() {
+    myName = myName.trim().slice(0, 16);
+    if (!myName) { homeErr = 'Pick a name first.'; render(); return false; }
+    save('localStorage', 'bfl_name', myName); homeErr = '';
+    return true;
+  }
+
+  $app.addEventListener('input', e => {
+    if (e.target.id === 'name') myName = e.target.value;
+    if (e.target.id === 'code') { roomCode = cleanCode(e.target.value); e.target.value = roomCode; }
+    if (e.target.id === 'answer') {
+      draft = e.target.value;
+      const b = $app.querySelector('[data-act=write]'); if (b) b.disabled = !draft.trim();
+      if (nope) { nope = ''; const el = document.getElementById('nope'); if (el) el.textContent = ''; }
+    }
+  });
+  $app.addEventListener('change', e => {
+    if (e.target.id === 'rounds') act({ t: 'rounds', rounds: e.target.value });
+    if (e.target.id === 'mode') { save('localStorage', 'bfl_mode', e.target.value); act({ t: 'mode', mode: e.target.value }); }
+  });
+  $app.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    if (e.target.id === 'code') go('join');
+    if (e.target.id === 'answer') go('write');
+  });
+  $app.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el && !el.disabled) go(el.dataset.act, el);
+  });
+
+  function go(a, el) {
+    switch (a) {
+      case 'create':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (readName()) createRoom();
+        break;
+      case 'join':
+        if (typeof Peer === 'undefined') { homeErr = 'The connection library did not load. Refresh the page.'; render(); return; }
+        if (!readName()) return;
+        if (roomCode.length !== 5) { homeErr = 'Room codes are 5 letters.'; render(); return; }
+        joinRoom(roomCode);
+        break;
+      case 'copy': {
+        const url = shareUrl();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('Invite link copied.'), () => prompt('Copy this link:', url));
+        else prompt('Copy this link:', url);
+        break;
+      }
+      case 'start': act({ t: 'start' }); break;
+      case 'lobby': act({ t: 'lobby' }); break;
+      case 'write': if (draft.trim()) act({ t: 'write', text: draft }); break;
+      case 'vote': act({ t: 'vote', i: parseInt(el.dataset.i, 10) }); break;
+      case 'skip': act({ t: 'skip' }); break;
+      case 'next': act({ t: 'next' }); break;
+      case 'reconnect':
+        toast('Reconnecting…');
+        if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+        if (peer && !peer.destroyed) connectHost();
+        break;
+      case 'leave': location.href = location.pathname; break;
+    }
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
