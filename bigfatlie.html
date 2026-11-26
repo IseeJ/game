@@ -72,9 +72,9 @@ input::placeholder { color: #aaa397; font-weight: 400; }
 .code.small { font-size: 2rem; letter-spacing: 0; line-height: 1.2; }
 .lobby h2 { margin: 20px 0 0; font-size: 1.1rem; text-align: left; }
 .packs { display: grid; gap: 6px; }
-.pack { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: 12px; font-weight: 700; text-align: left; cursor: pointer; }
-.pack input { flex: none; width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
-.pack em { margin-left: auto; font-style: normal; font-weight: 400; font-size: .85rem; color: var(--dim); }
+.pack, .tick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: 12px; font-weight: 700; text-align: left; cursor: pointer; }
+.pack input, .tick input { flex: none; width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
+.pack em, .tick em { margin-left: auto; font-style: normal; font-weight: 400; font-size: .85rem; color: var(--dim); }
 .dim { color: var(--dim); font-weight: 400; }
 .plist { list-style: none; margin: 0 0 14px; padding: 0; text-align: left; }
 .plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
@@ -195,6 +195,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   let view = null;     // what this player is allowed to see
   let busy = '', homeErr = '', lost = false, joinTimer = null;
   let draft = '', nope = '', selKey = '';
+  let race = null;     // my own progress in a timed quiz: { id, i, score, ms, picked, t0 }
 
   // The packs the host ticked last time, or all of them.
   function savedPacks() {
@@ -206,10 +207,12 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
 
   // Solo: the best result so far, kept on this device.
   function bestSolo() { try { const b = JSON.parse(load('localStorage', 'bfl_best')); return b && b.of ? b : null; } catch (e) { return null; } }
-  function keepBest(score, of) {
-    const b = bestSolo();
-    if (!b || score / of > b.score / b.of || (score / of === b.score / b.of && of > b.of)) save('localStorage', 'bfl_best', JSON.stringify({ score, of }));
+  function keepBest(score, of, ms) {          // better score first; then more questions; then a faster time
+    const b = bestSolo(), r = score / of, br = b ? b.score / b.of : -1;
+    if (!b || r > br || (r === br && (of > b.of || (of === b.of && ms && (!b.ms || ms < b.ms))))) save('localStorage', 'bfl_best', JSON.stringify({ score, of, ms: ms || 0 }));
   }
+  const clock = ms => { const s = ms / 1000; return s < 60 ? s.toFixed(1) + 's' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
+  const bestText = b => b.score + ' of ' + b.of + (b.ms ? ' in ' + clock(b.ms) : '');
 
   /* ---------------- HOST ---------------- */
   const P = pid => G.players.find(p => p.pid === pid);
@@ -224,6 +227,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       busy = ''; roomCode = code;
       G = {
         code, phase: 'lobby', solo: false, mode: load('localStorage', 'bfl_mode') === 'quiz' ? 'quiz' : 'bluff',
+        timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
         streak: 0, canned: {}, rounds: 8, packs: savedPacks(),
         round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
@@ -253,6 +257,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     isHost = true;
     G = {
       code: '', phase: 'lobby', solo: true, mode: 'quiz', streak: 0, canned: {}, rounds: 10, packs: savedPacks(),
+      timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
       round: 0, hostPid: myPid,
       players: [{ pid: myPid, name: myName.trim() || 'You', score: 0, gain: 0, conn: null, connected: true }],
       q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
@@ -288,6 +293,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       toastAll(p.name + ' left before telling the truth. Next question.');
       G.round--; startRound(); return;
     }
+    if (G.phase === 'race') finishRace();
     if (G.phase === 'write') maybeVote();
     else if (G.phase === 'vote') maybeReveal();
     sync();
@@ -321,7 +327,38 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     // Every fact from every ticked pack goes into one shuffled pile, remembering which pack it came from.
     G.pool = [].concat(...G.packs.filter(n => n !== US).map(n => FACT_PACKS[n].map(f => ({ f, pack: n }))));
     G.decks.facts = [];
-    startRound();
+    G.raced = false;
+    if (G.mode === 'quiz' && G.timed) startRace(); else startRound();
+  }
+
+  /* A timed quiz is a race. Everyone is handed the same questions at once and works through
+     them at their own pace on their own screen, reporting their score and time as they go.
+     Nobody waits for anybody; the game ends when the last player finishes. */
+  function startRace() {
+    const live = G.players.filter(p => p.connected);
+    if (!G.pool.length || !live.length) {
+      G.phase = 'lobby'; G.players = live;
+      toastAll('Tick a pack of facts first.');
+      sync(); return;
+    }
+    const qs = [], n = Math.min(G.rounds, G.pool.length);
+    for (let k = 0; k < n; k++) {
+      const d = draw('facts', G.pool), truth = truthsOf(d.f)[0];
+      const options = shuffle([truth].concat(wrongAnswers(d, 3, [])));
+      qs.push({ kind: 'quiz', label: d.pack, text: d.f[0], options, truth: options.indexOf(truth) });
+    }
+    G.race = { id: Date.now(), qs };
+    G.players.forEach(p => { p.racing = p.connected; p.rAt = 0; p.rMs = 0; p.rDone = false; p.score = 0; p.gain = 0; });
+    G.raced = true; G.round = 0; G.q = null;
+    G.phase = 'race';
+    sync();
+  }
+
+  function finishRace(now) {                  // now: the host has called time
+    if (G.phase !== 'race') return;
+    if (!now && !G.players.filter(p => p.racing).every(p => p.rDone || !p.connected)) return;
+    G.phase = 'gameover';
+    if (G.solo) keepBest(P(myPid).score, G.race.qs.length, P(myPid).rMs);
   }
 
   function startRound() {
@@ -426,6 +463,20 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'mode':
         if (amHost && G.phase === 'lobby' && !G.solo && msg.mode in MODES) { G.mode = msg.mode; sync(); }
         break;
+      case 'timed':
+        if (amHost && G.phase === 'lobby') { G.timed = !!msg.on; sync(); }
+        break;
+      case 'race': {                            // a racer reporting where they have got to
+        if (G.phase !== 'race' || !p.racing || p.rDone) return;
+        const n = G.race.qs.length;
+        p.rAt = Math.max(0, Math.min(n, parseInt(msg.i, 10) || 0));
+        p.score = Math.max(0, Math.min(p.rAt, parseInt(msg.score, 10) || 0));
+        p.rMs = Math.max(0, parseInt(msg.ms, 10) || 0);
+        p.rDone = !!msg.done && p.rAt >= n;
+        finishRace();
+        sync();
+        break;
+      }
       case 'start':
         if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
             G.players.filter(x => x.connected).length >= needPlayers(G.mode, G.solo)) startGame();
@@ -457,6 +508,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       }
       case 'skip':                              // don't wait for stragglers
         if (!amHost) return;
+        if (G.phase === 'race') { finishRace(true); sync(); return; }   // call time on the race
         if (G.phase === 'write' && (G.q.kind === 'facts' || G.subs[G.q.subject])) {
           G.writers = G.writers.filter(w => G.subs[w]); maybeVote(); sync();
         } else if (G.phase === 'vote') { reveal(); sync(); }
@@ -479,12 +531,15 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function viewFor(pid) {
     const ph = G.phase, q = G.q;
     const v = {
-      code: G.code, phase: ph, solo: G.solo, mode: G.mode, streak: G.streak, rounds: G.rounds, packs: G.packs, round: G.round, you: pid, hostPid: G.hostPid,
+      code: G.code, phase: ph, solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
+      total: G.raced && G.race ? G.race.qs.length : G.rounds, streak: G.streak, rounds: G.rounds, packs: G.packs, round: G.round, you: pid, hostPid: G.hostPid,
       players: G.players.map(p => ({
         pid: p.pid, name: p.name, score: p.score, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0,
+        racing: !!p.racing, at: p.rAt || 0, ms: p.rMs || 0, rdone: !!p.rDone,
         done: ph === 'write' ? (!!G.subs[p.pid] || !G.writers.includes(p.pid)) : ph === 'vote' ? (G.votes[p.pid] !== undefined || p.pid === q.subject) : false
       }))
     };
+    if (ph === 'race') { v.race = G.race; return v; }
     if (ph === 'lobby' || ph === 'gameover' || !q) return v;
     const subject = q.subject ? P(q.subject) : null;
     v.q = {
@@ -596,8 +651,19 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
 
   function render(force) {
     if (!view) { $app.innerHTML = homeHTML(); return; }
-    const key = view.round + ':' + view.phase + ':' + (view.q ? view.q.text : '');   // a replaced question counts as new
+    if (view.phase === 'race' && (!race || race.id !== view.race.id)) {       // a new race, or I have just come back to one
+      const me = view.players.find(p => p.pid === view.you) || {};
+      race = { id: view.race.id, i: me.at || 0, score: me.score || 0, ms: me.ms || 0, picked: null, t0: Date.now() };
+    }
+    const key = view.phase === 'race' ? 'race:' + race.id + ':' + race.i + ':' + race.picked
+      : view.round + ':' + view.phase + ':' + (view.q ? view.q.text : '');   // a replaced question counts as new
     const same = key === selKey;
+    // In a race the others' progress arrives all the time. It only ever touches the strip at the top.
+    if (same && !force && view.phase === 'race' && document.getElementById('race')) {
+      const s = $app.querySelector('.scores');
+      if (s) s.outerHTML = raceStripHTML();
+      return;
+    }
     if (!same) { selKey = key; draft = ''; nope = ''; }
     // Someone else handing in must not wipe what a player is typing:
     // while I am still writing, only the score strip is refreshed.
@@ -606,7 +672,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       if (s) s.outerHTML = scoresHTML();
       return;
     }
-    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : gameHTML();
+    let html = view.phase === 'lobby' ? lobbyHTML() : view.phase === 'gameover' ? overHTML() : view.phase === 'race' ? raceHTML() : gameHTML();
     if (lost) {
       html += '<div class="overlay"><div class="dialog"><h2>Connection lost</h2><p>The link to the host dropped. If the host closed the game, the room is gone.</p>' +
         '<div class="row"><button class="btn primary" data-act="reconnect">Try to reconnect</button><button class="btn" data-act="leave">Leave</button></div></div></div>';
@@ -652,11 +718,13 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<div class="field"><span>Question packs</span><div class="packs">' + names.map(p =>
         '<label class="pack"><input type="checkbox" data-pack="' + esc(p) + '"' + (v.packs.includes(p) ? ' checked' : '') + '>' + esc(p) + '<em>' + packSize(p) + '</em></label>').join('') + '</div></div>' +
       '<label class="field inline"><span>How many</span><select id="rounds">' + rounds + '</select></label>' +
+      (quiz ? '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="timed"' + (v.timed ? ' checked' : '') + '>Timed' +
+        '<em>' + (v.solo ? 'against the clock' : 'everyone at their own pace') + '</em></label></div></div>' : '') +
       '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? 'Start' : 'Start game')) + '</button>';
     if (v.solo) {
       const b = bestSolo();
       return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">You against the facts</div>' +
-        '<p class="note">Four answers, one is true.' + (b ? ' Your best: ' + b.score + ' of ' + b.of + '.' : '') + '</p>' +
+        '<p class="note">Four answers, one is true.' + (b ? ' Your best: ' + bestText(b) + '.' : '') + '</p>' +
         settings + '<button class="btn" data-act="leave">Back to the start</button></main>';
     }
     return '<main class="lobby">' +
@@ -668,7 +736,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         ? settings +
           (!quiz && n === 2 ? '<p class="fine">With two players the game adds decoy answers of its own, and "About us" questions are left out.</p>' : '') +
           '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
-        : '<p class="note">Waiting for the host to start. ' + (quiz ? 'Quiz' : 'Bluff') + ', ' + v.rounds + ' questions from: ' + esc(ticked.join(', ')) + '.</p>') +
+        : '<p class="note">Waiting for the host to start. ' + (quiz ? (v.timed ? 'Timed quiz' : 'Quiz') : 'Bluff') + ', ' + v.rounds + ' questions from: ' + esc(ticked.join(', ')) + '.</p>') +
       '</main>';
   }
 
@@ -681,8 +749,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   }
 
   // The question card. A fact shows its gap, or the truth once it is revealed.
-  function questionHTML(truth) {
-    const q = view.q;
+  function questionHTML(truth, other) {
+    const q = other || view.q;
     const label = q.kind !== 'us' ? esc(q.label || 'Weird fact') : 'About ' + (q.subjectPid === view.you ? 'you' : esc(nameOf(q.subjectPid)));
     const text = q.kind !== 'us'
       ? (q.text.includes('_____')
@@ -692,6 +760,41 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     return '<div class="q"><p>' + label + '</p><h2>' + text + '</h2></div>';
   }
   const nameOf = pid => { const p = view.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
+
+  /* ---------------- THE TIMED QUIZ ---------------- */
+  // The strip at the top of a race: how far along everyone is. Scores stay hidden until the end.
+  function raceStripHTML() {
+    const v = view, n = v.race.qs.length;
+    return '<ul class="scores">' + v.players.filter(p => p.racing).map(p => {
+      const mine = p.pid === v.you, at = mine ? Math.min(n, race.i + (race.picked !== null ? 1 : 0)) : p.at;
+      return '<li class="' + (p.connected ? '' : 'off ') + (mine ? 'me' : '') + '"><span class="nm">' + esc(p.name) + '</span>' +
+        (p.rdone ? '<span class="mk">done</span>' : '') + '<b>' + at + '/' + n + '</b></li>';
+    }).join('') + '</ul>';
+  }
+
+  function raceHTML() {
+    const v = view, qs = v.race.qs, n = qs.length, amHost = v.you === v.hostPid;
+    const me = v.players.find(p => p.pid === v.you);
+    const bar = right => '<header class="bar"><span>' + (v.solo ? 'Solo quiz' : 'Room <b>' + esc(v.code) + '</b>') + '</span><span>' + right + '</span></header>';
+    const end = !v.solo && amHost ? '<button class="btn" data-act="skip">End the race now</button>' : '';
+    if (!me || !me.racing) {
+      return bar('Timed quiz') + raceStripHTML() + '<main class="stage" id="race"><p class="status">A timed quiz is under way. You will be in the next game.</p><div class="action">' + end + '</div></main>';
+    }
+    if (race.i >= n) {
+      return bar('Finished') + raceStripHTML() + '<main class="stage" id="race">' +
+        '<div class="q"><p>All done</p><h2>' + race.score + ' of ' + n + ' in ' + clock(race.ms) + '</h2></div>' +
+        '<p class="status">' + (v.solo ? '' : 'Waiting for the others to finish. Results appear when everyone is done.') + '</p><div class="action">' + end + '</div></main>';
+    }
+    const q = qs[race.i], picked = race.picked, done = picked !== null;
+    return bar('Question ' + (race.i + 1) + ' of ' + n + ' · <span id="clock">' + clock(race.ms + (done ? 0 : Date.now() - race.t0)) + '</span>') +
+      raceStripHTML() + '<main class="stage" id="race">' + questionHTML(done ? q.options[q.truth] : null, q) +
+      '<p class="status">' + (!done ? 'Which one is true?' : picked === q.truth ? 'Correct!' : 'Not this time.') + '</p>' +
+      '<div class="opts">' + q.options.map((o, i) => done
+        ? '<div class="opt' + (i === q.truth ? ' truth' : i === picked ? ' trap' : '') + '">' + esc(o) +
+          (i === q.truth ? '<small><b>The truth</b>' + (i === picked ? ' · your pick' : '') + '</small>' : i === picked ? '<small>your pick</small>' : '') + '</div>'
+        : '<button class="opt" data-act="rpick" data-i="' + i + '">' + esc(o) + '</button>').join('') + '</div>' +
+      '<div class="action">' + (done ? '<button class="btn primary big" data-act="rnext">' + (race.i + 1 >= n ? 'Finish' : 'Next question') + '</button>' : '') + '</div></main>';
+  }
 
   function gameHTML() {
     const v = view, amHost = v.you === v.hostPid, q = v.q, quiz = q.kind === 'quiz';
@@ -755,23 +858,25 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function overHTML() {
     const v = view, amHost = v.you === v.hostPid;
     if (v.solo) {
-      const score = v.players[0].score, pct = score / v.rounds, b = bestSolo();
-      return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">' + score + ' of ' + v.rounds + '</div>' +
+      const score = v.players[0].score, pct = score / v.total, b = bestSolo();
+      return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">' + score + ' of ' + v.total + (v.raced ? ' in ' + clock(v.players[0].ms) : '') + '</div>' +
         '<p class="note">' + (pct === 1 ? 'Flawless. Suspicious, even.' : pct >= 0.7 ? 'Sharp. The facts are worried.' : pct >= 0.4 ? 'Respectable. The facts put up a fight.' : 'The facts win this one.') +
-        (b ? ' Your best is ' + b.score + ' of ' + b.of + '.' : '') + '</p>' +
+        (b ? ' Your best is ' + bestText(b) + '.' : '') + '</p>' +
         '<button class="btn primary big" data-act="start">Play again</button>' +
         '<button class="btn" data-act="lobby">Change packs</button><button class="btn" data-act="leave">Back to the start</button></main>';
     }
-    const ranked = v.players.slice().sort((a, b) => b.score - a.score);
-    // Everyone on the top score shares the win, and equal scores share a place.
-    const winners = ranked.filter(p => p.score === ranked[0].score).map(p => esc(p.name));
+    // A timed quiz ranks by score, then by the faster time. Only the people who raced are listed.
+    const tied = (a, b) => a.score === b.score && (!v.raced || a.ms === b.ms);
+    const ranked = v.players.filter(p => !v.raced || p.racing).sort((a, b) => b.score - a.score || (v.raced ? a.ms - b.ms : 0));
+    // Everyone level at the top shares the win, and equal results share a place.
+    const winners = ranked.filter(p => tied(p, ranked[0])).map(p => esc(p.name));
     const headline = winners.length === 1 ? winners[0] + ' wins'
       : (winners.length === ranked.length && ranked.length > 2) ? 'Everyone ties'
       : winners.slice(0, -1).join(', ') + ' and ' + winners[winners.length - 1] + ' tie';
-    const place = p => ranked.findIndex(x => x.score === p.score) + 1;
-    return '<main class="lobby"><p class="eyebrow">' + (v.mode === 'quiz' ? 'Top of the class' : 'Best liar') + '</p><div class="code small">' + headline + '</div>' +
+    const place = p => ranked.findIndex(x => tied(x, p)) + 1;
+    return '<main class="lobby"><p class="eyebrow">' + (v.raced ? 'Fastest brain' : v.mode === 'quiz' ? 'Top of the class' : 'Best liar') + '</p><div class="code small">' + headline + '</div>' +
       '<ul class="plist rank">' + ranked.map(p =>
-        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
+        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + (v.raced ? '/' + v.total + ' · ' + (p.rdone ? clock(p.ms) : 'did not finish') : '') + '</b></li>').join('') + '</ul>' +
       (amHost
         ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < needPlayers(v.mode, v.solo) ? ' disabled' : '') + '>Play again</button>' +
           '<button class="btn" data-act="lobby">Back to lobby</button>'
@@ -797,6 +902,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   });
   $app.addEventListener('change', e => {
     if (e.target.id === 'rounds') act({ t: 'rounds', rounds: e.target.value });
+    if (e.target.id === 'timed') { save('localStorage', 'bfl_timed', e.target.checked ? '1' : '0'); act({ t: 'timed', on: e.target.checked }); }
     if (e.target.id === 'mode') { save('localStorage', 'bfl_mode', e.target.value); act({ t: 'mode', mode: e.target.value }); }
     if (e.target.dataset.pack) act({ t: 'pack', name: e.target.dataset.pack, on: e.target.checked });
   });
@@ -831,6 +937,21 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'start': act({ t: 'start' }); break;
       case 'lobby': act({ t: 'lobby' }); break;
       case 'solo': startSolo(); break;
+      case 'rpick': {                           // my answer in a timed quiz: stop the clock
+        if (!race || race.picked !== null || view.phase !== 'race') break;
+        const q = view.race.qs[race.i], i = parseInt(el.dataset.i, 10);
+        race.ms += Date.now() - race.t0; race.picked = i;
+        if (i === q.truth) race.score++;
+        act({ t: 'race', i: race.i + 1, score: race.score, ms: race.ms, done: false });
+        render();
+        break;
+      }
+      case 'rnext':                             // on to the next one: the clock starts again
+        if (!race || race.picked === null || view.phase !== 'race') break;
+        race.i++; race.picked = null; race.t0 = Date.now();
+        if (race.i >= view.race.qs.length) act({ t: 'race', i: race.i, score: race.score, ms: race.ms, done: true });
+        if (view.phase === 'race') render();
+        break;
       case 'write': if (draft.trim()) act({ t: 'write', text: draft }); break;
       case 'canned': act({ t: 'write', canned: true }); break;
       case 'vote': act({ t: 'vote', i: parseInt(el.dataset.i, 10) }); break;
@@ -844,6 +965,12 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'leave': location.href = location.pathname; break;
     }
   }
+
+  // The stopwatch in a timed quiz only runs while a question is waiting for my answer.
+  setInterval(() => {
+    const el = document.getElementById('clock');
+    if (el && race && view && view.phase === 'race' && race.picked === null) el.textContent = clock(race.ms + Date.now() - race.t0);
+  }, 100);
 
   window.addEventListener('beforeunload', e => {
     if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
