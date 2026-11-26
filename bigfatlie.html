@@ -71,6 +71,10 @@ input::placeholder { color: #aaa397; font-weight: 400; }
 .code { font-size: clamp(3rem, 16vw, 4.4rem); font-weight: 900; letter-spacing: .12em; color: var(--accent); line-height: 1.05; }
 .code.small { font-size: 2rem; letter-spacing: 0; line-height: 1.2; }
 .lobby h2 { margin: 20px 0 0; font-size: 1.1rem; text-align: left; }
+.packs { display: grid; gap: 6px; }
+.pack { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: 12px; font-weight: 700; text-align: left; cursor: pointer; }
+.pack input { flex: none; width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
+.pack em { margin-left: auto; font-style: normal; font-weight: 400; font-size: .85rem; color: var(--dim); }
 .dim { color: var(--dim); font-weight: 400; }
 .plist { list-style: none; margin: 0 0 14px; padding: 0; text-align: left; }
 .plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
@@ -113,6 +117,8 @@ button.opt:disabled { cursor: not-allowed; opacity: .5; }
 .opt small { display: block; margin-top: 6px; font-size: .8rem; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--dim); }
 .opt small b { color: var(--lie); }
 .opt.truth small b { color: var(--truth); }
+.opt.trap { border-color: var(--lie); }
+.gains li b.neg { color: var(--lie); }
 .gains { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .gains li { background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: .9rem; font-weight: 700; }
 .gains li b { color: var(--accent); }
@@ -143,9 +149,16 @@ button.opt:disabled { cursor: not-allowed; opacity: .5; }
 
 // Two answers count as the same if they match once case, punctuation and "a/an/the" are ignored.
 const tidy = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ').replace(/\b(a|an|the)\b/g, ' ').replace(/\s+/g, ' ').trim();
-const FIND = 2;   // points for picking the truth
-const FOOL = 1;   // points for each friend who picks your lie
-const KNOWN = 1;  
+const FIND = 4;    // bluff: points for picking the truth
+const FOOL = 2;    // bluff: points for each friend who picks the lie you wrote
+const CANNED = 1;  // bluff: the same, when you used a ready-made lie (half)
+const TRAP = 2;    // bluff: points you LOSE for picking one of the game's own decoys
+const KNOWN = 2;   // "About us": points to the truth-teller for each friend who found the truth
+const QUIZ = 1;    // quiz: points for a right answer
+
+// A fact is ['question', 'answer', 'other accepted spellings'..., ['wrong answer', ...]]. The last list is optional.
+const truthsOf = f => f.slice(1).filter(x => typeof x === 'string');
+const decoysOf = f => f.find(x => Array.isArray(x)) || [];
 
 
 (() => {
@@ -153,9 +166,15 @@ const KNOWN = 1;
 
   const PREFIX = 'bigfatlie-v1-';
   const MAX_LEN = 60;
-  const MIN_PLAYERS = 3, MAX_PLAYERS = 10;
+  const MAX_PLAYERS = 10;
+  const MODES = { bluff: 'Bluff: write lies', quiz: 'Quiz: just pick the answer' };
+  const needPlayers = (mode, solo) => solo || mode === 'quiz' ? 1 : 2;      // fewest players to start
   const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const MODES = { mix: 'A bit of both', facts: 'Weird facts', us: 'About us' };
+  // Question packs come from bfl.js. "About us" is the built-in pack of questions about the players.
+  const FACT_PACKS = typeof PACKS !== 'undefined' ? PACKS : { 'Weird facts': FACTS };
+  const US = 'About us';
+  const PACK_NAMES = Object.keys(FACT_PACKS).concat(US);
+  const packSize = n => n === US ? ABOUT.length : FACT_PACKS[n].length;
 
   const $app = document.getElementById('app'), $toast = document.getElementById('toast');
   const load = (store, k) => { try { return window[store].getItem(k); } catch (e) { return null; } };
@@ -177,6 +196,21 @@ const KNOWN = 1;
   let busy = '', homeErr = '', lost = false, joinTimer = null;
   let draft = '', nope = '', selKey = '';
 
+  // The packs the host ticked last time, or all of them.
+  function savedPacks() {
+    let list = [];
+    try { list = JSON.parse(load('localStorage', 'bfl_packs')) || []; } catch (e) {}
+    list = PACK_NAMES.filter(n => Array.isArray(list) && list.includes(n));
+    return list.length ? list : PACK_NAMES.slice();
+  }
+
+  // Solo: the best result so far, kept on this device.
+  function bestSolo() { try { const b = JSON.parse(load('localStorage', 'bfl_best')); return b && b.of ? b : null; } catch (e) { return null; } }
+  function keepBest(score, of) {
+    const b = bestSolo();
+    if (!b || score / of > b.score / b.of || (score / of === b.score / b.of && of > b.of)) save('localStorage', 'bfl_best', JSON.stringify({ score, of }));
+  }
+
   /* ---------------- HOST ---------------- */
   const P = pid => G.players.find(p => p.pid === pid);
   const isLive = pid => { const p = P(pid); return !!(p && p.connected); };
@@ -189,10 +223,11 @@ const KNOWN = 1;
     peer.on('open', () => {
       busy = ''; roomCode = code;
       G = {
-        code, phase: 'lobby', rounds: 8, mode: load('localStorage', 'bfl_mode') in MODES ? load('localStorage', 'bfl_mode') : 'mix',
+        code, phase: 'lobby', solo: false, mode: load('localStorage', 'bfl_mode') === 'quiz' ? 'quiz' : 'bluff',
+        streak: 0, canned: {}, rounds: 8, packs: savedPacks(),
         round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
-        q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, lastSubject: null
+        q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
       };
       setRoomUrl(code);
       sync();
@@ -211,6 +246,18 @@ const KNOWN = 1;
       else if (!G) { peer.destroy(); busy = ''; homeErr = 'Could not reach the connection server. Check your internet and try again.'; render(); }
     });
     peer.on('disconnected', () => { if (peer && !peer.destroyed) peer.reconnect(); });
+  }
+
+  // Solo: the same game with nobody else in it, so no connection is needed at all.
+  function startSolo() {
+    isHost = true;
+    G = {
+      code: '', phase: 'lobby', solo: true, mode: 'quiz', streak: 0, canned: {}, rounds: 10, packs: savedPacks(),
+      round: 0, hostPid: myPid,
+      players: [{ pid: myPid, name: myName.trim() || 'You', score: 0, gain: 0, conn: null, connected: true }],
+      q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
+    };
+    sync();
   }
 
   function hostJoin(conn, msg) {
@@ -251,37 +298,65 @@ const KNOWN = 1;
     return list[G.decks[kind].pop()];
   }
 
+  // n wrong answers for a fact (d = { f: the fact, pack: its pack }), avoiding anything in `taken`.
+  // The fact's own wrong answers come first. If it has none, real answers are borrowed from
+  // other facts in the pack, preferring ones that look alike (numbers for numbers, similar length).
+  function wrongAnswers(d, n, taken) {
+    const truths = truthsOf(d.f), isNum = /\d/.test(truths[0]), words = truths[0].split(' ').length;
+    const avoid = new Set(truths.map(tidy).concat(taken)), out = [];
+    const take = list => { for (const x of shuffle(list)) { if (out.length >= n) return; const k = tidy(x); if (k && !avoid.has(k)) { avoid.add(k); out.push(x); } } };
+    take(decoysOf(d.f));
+    if (out.length < n) {
+      const others = FACT_PACKS[d.pack].filter(g => g !== d.f).map(g => truthsOf(g)[0]);
+      take(others.filter(a => /\d/.test(a) === isNum && Math.abs(a.split(' ').length - words) <= 1));
+      take(others);
+    }
+    return out;
+  }
+
   function startGame() {
     G.players = G.players.filter(p => p.connected);
     G.players.forEach(p => { p.score = 0; p.gain = 0; });
-    G.round = 0; G.lastSubject = null;
+    G.round = 0; G.lastSubject = null; G.streak = 0;
+    // Every fact from every ticked pack goes into one shuffled pile, remembering which pack it came from.
+    G.pool = [].concat(...G.packs.filter(n => n !== US).map(n => FACT_PACKS[n].map(f => ({ f, pack: n }))));
+    G.decks.facts = [];
     startRound();
   }
 
   function startRound() {
-    const live = G.players.filter(p => p.connected);
-    if (live.length < MIN_PLAYERS) {
+    const live = G.players.filter(p => p.connected), quiz = G.mode === 'quiz';
+    const useFacts = G.pool.length > 0;
+    const useUs = !quiz && G.packs.includes(US) && ABOUT.length > 0 && live.length >= 3;     // "About us" needs someone to lie and someone else to guess
+    if (live.length < needPlayers(G.mode, G.solo) || (!useFacts && !useUs)) {
       G.phase = 'lobby'; G.players = live;
-      toastAll('Not enough players left. Back to the lobby.');
+      toastAll(useFacts || useUs ? 'Not enough players left. Back to the lobby.' : 'Nothing to ask with these packs and this many players.');
       sync(); return;
     }
     G.round++;
-    const kind = G.mode === 'mix' ? (G.round % 2 ? 'facts' : 'us') : G.mode;
-    if (kind === 'facts') {
-      const f = draw('facts', FACTS);
-      G.q = { kind, text: f[0], truths: f.slice(1), subject: null };
-    } else {
+    G.writers = []; G.subs = {}; G.canned = {}; G.options = []; G.votes = {};
+    G.players.forEach(p => { p.gain = 0; });
+    // With both fact packs and "About us" ticked, the two kinds of question take turns.
+    const kind = quiz ? 'quiz' : useFacts && useUs ? (G.round % 2 ? 'facts' : 'us') : useFacts ? 'facts' : 'us';
+    if (kind === 'us') {
       const n = G.players.length, cur = G.players.findIndex(p => p.pid === G.lastSubject);   // the next friend in turn
       let subject = live[0];
       for (let i = 1; i <= n; i++) { const c = G.players[(cur + i + n) % n]; if (c.connected) { subject = c; break; } }
       G.lastSubject = subject.pid;
       const a = draw('us', ABOUT);
       G.q = { kind, you: a[0], them: a[1], truths: [], subject: subject.pid };
+    } else {
+      const d = draw('facts', G.pool);
+      G.q = { kind, d, label: d.pack, text: d.f[0], truths: truthsOf(d.f), subject: null };
     }
-    G.writers = live.map(p => p.pid);
-    G.subs = {}; G.options = []; G.votes = {};
-    G.players.forEach(p => { p.gain = 0; });
-    G.phase = 'write';
+    if (kind === 'quiz') {                      // no lying: the truth and three wrong answers, straight to the vote
+      G.options = shuffle([{ text: G.q.truths[0], truth: true, authors: [] }]
+        .concat(wrongAnswers(G.q.d, 3, []).map(text => ({ text, truth: false, authors: [], house: true }))));
+      G.phase = 'vote';
+    } else {
+      G.writers = live.map(p => p.pid);
+      G.phase = 'write';
+    }
     sync();
   }
 
@@ -300,6 +375,11 @@ const KNOWN = 1;
       const same = opts.find(o => !o.truth && tidy(o.text) === tidy(text));
       if (same) same.authors.push(pid); else opts.push({ text, truth: false, authors: [pid] });
     });
+    // With only a couple of lies on the table, the game adds decoys of its own. Picking one costs points.
+    const lies = opts.length - 1;
+    if (G.q.kind === 'facts' && lies < 3) {
+      wrongAnswers(G.q.d, 4 - lies, opts.map(o => tidy(o.text))).forEach(text => opts.push({ text, truth: false, authors: [], house: true }));
+    }
     G.options = shuffle(opts);
     G.phase = 'vote';
     maybeReveal();
@@ -318,9 +398,12 @@ const KNOWN = 1;
     const add = (pid, n) => { const p = P(pid); if (p) { p.score += n; p.gain += n; } };
     Object.keys(G.votes).forEach(pid => {
       const o = G.options[G.votes[pid]];
-      if (o.truth) { add(pid, FIND); if (G.q.subject) add(G.q.subject, KNOWN); }
-      else o.authors.forEach(a => add(a, FOOL));
+      if (G.q.kind === 'quiz') { if (o.truth) add(pid, QUIZ); }
+      else if (o.truth) { add(pid, FIND); if (G.q.subject) add(G.q.subject, KNOWN); }
+      else if (o.house) add(pid, -TRAP);                                   // fell for one of the game's decoys
+      else o.authors.forEach(a => add(a, G.canned[a] ? CANNED : FOOL));
     });
+    if (G.solo) { const o = G.options[G.votes[myPid]]; G.streak = o && o.truth ? G.streak + 1 : 0; }
     G.phase = 'reveal';
   }
 
@@ -333,17 +416,32 @@ const KNOWN = 1;
       case 'rounds':
         if (amHost && G.phase === 'lobby') { G.rounds = Math.min(30, Math.max(3, parseInt(msg.rounds, 10) || 8)); sync(); }
         break;
+      case 'pack':                              // tick or untick one pack
+        if (!amHost || G.phase !== 'lobby' || !PACK_NAMES.includes(msg.name)) return;
+        G.packs = PACK_NAMES.filter(n => n === msg.name ? !!msg.on : G.packs.includes(n));
+        if (!G.packs.length) G.packs = [msg.name];              // at least one pack stays on
+        save('localStorage', 'bfl_packs', JSON.stringify(G.packs));
+        sync();
+        break;
       case 'mode':
-        if (amHost && G.phase === 'lobby' && msg.mode in MODES) { G.mode = msg.mode; sync(); }
+        if (amHost && G.phase === 'lobby' && !G.solo && msg.mode in MODES) { G.mode = msg.mode; sync(); }
         break;
       case 'start':
         if (amHost && (G.phase === 'lobby' || G.phase === 'gameover') &&
-            G.players.filter(x => x.connected).length >= MIN_PLAYERS) startGame();
+            G.players.filter(x => x.connected).length >= needPlayers(G.mode, G.solo)) startGame();
         break;
       case 'write': {
-        const text = cleanText(msg.text);
-        if (G.phase !== 'write' || !G.writers.includes(pid) || G.subs[pid] || !text) return;
-        if (G.q.kind === 'facts' && isTruth(text)) { tell(pid, { t: 'nope' }); return; }   // they wrote the real answer
+        if (G.phase !== 'write' || !G.writers.includes(pid) || G.subs[pid]) return;
+        let text = cleanText(msg.text);
+        if (msg.canned) {                         // they asked for a ready-made lie (worth half)
+          if (G.q.kind !== 'facts') return;
+          text = wrongAnswers(G.q.d, 1, Object.values(G.subs).map(tidy))[0];
+          if (!text) { tell(pid, { t: 'nope', why: 'none' }); return; }
+          G.canned[pid] = true;
+        } else {
+          if (!text) return;
+          if (G.q.kind === 'facts' && isTruth(text)) { tell(pid, { t: 'nope' }); return; }   // they wrote the real answer
+        }
         G.subs[pid] = text;
         maybeVote();
         sync();
@@ -365,7 +463,7 @@ const KNOWN = 1;
         break;
       case 'next':
         if (G.phase !== 'reveal' || !(amHost || pid === G.q.subject)) return;
-        if (G.round >= G.rounds) { G.phase = 'gameover'; sync(); }
+        if (G.round >= G.rounds) { G.phase = 'gameover'; if (G.solo) keepBest(P(myPid).score, G.rounds); sync(); }
         else startRound();
         break;
       case 'lobby':
@@ -381,7 +479,7 @@ const KNOWN = 1;
   function viewFor(pid) {
     const ph = G.phase, q = G.q;
     const v = {
-      code: G.code, phase: ph, rounds: G.rounds, mode: G.mode, round: G.round, you: pid, hostPid: G.hostPid,
+      code: G.code, phase: ph, solo: G.solo, mode: G.mode, streak: G.streak, rounds: G.rounds, packs: G.packs, round: G.round, you: pid, hostPid: G.hostPid,
       players: G.players.map(p => ({
         pid: p.pid, name: p.name, score: p.score, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0,
         done: ph === 'write' ? (!!G.subs[p.pid] || !G.writers.includes(p.pid)) : ph === 'vote' ? (G.votes[p.pid] !== undefined || p.pid === q.subject) : false
@@ -390,13 +488,13 @@ const KNOWN = 1;
     if (ph === 'lobby' || ph === 'gameover' || !q) return v;
     const subject = q.subject ? P(q.subject) : null;
     v.q = {
-      kind: q.kind, subjectPid: q.subject,
-      text: q.kind === 'facts' ? q.text : pid === q.subject ? q.you : q.them.replace('{name}', subject ? subject.name : 'them')
+      kind: q.kind, label: q.label || '', subjectPid: q.subject,
+      text: q.kind !== 'us' ? q.text : pid === q.subject ? q.you : q.them.replace('{name}', subject ? subject.name : 'them')
     };
     if (ph === 'write') {
       v.write = {
         role: !G.writers.includes(pid) ? 'watch' : pid === q.subject ? 'truth' : 'lie',
-        mine: G.subs[pid] || null,
+        mine: G.subs[pid] || null, canned: !!G.canned[pid], canSuggest: q.kind === 'facts',
         waiting: G.writers.filter(w => isLive(w) && !G.subs[w]).length
       };
     } else {
@@ -408,6 +506,7 @@ const KNOWN = 1;
         options: G.options.map((o, i) => ({
           text: o.text, own: !o.truth && o.authors.includes(pid),
           truth: open ? o.truth : false, authors: open ? o.authors : [],
+          house: open && !!o.house, readyMade: open && o.authors.length > 0 && o.authors.every(a => G.canned[a]),
           pickers: open ? Object.keys(G.votes).filter(k => G.votes[k] === i) : []
         }))
       };
@@ -465,7 +564,7 @@ const KNOWN = 1;
   function onMsg(msg) {
     if (msg.t === 'toast') toast(msg.text);
     else if (msg.t === 'nope') {                // I typed the real answer by accident
-      nope = 'That is the real answer! Write a lie instead.';
+      nope = msg.why === 'none' ? 'No ready-made lie for this one. Write your own.' : 'That is the real answer! Write a lie instead.';
       const el = document.getElementById('nope'); if (el) el.textContent = nope;
     }
   }
@@ -528,29 +627,48 @@ const KNOWN = 1;
       '<div class="joinrow"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Room code" value="' + esc(roomCode) + '"' + dis + '>' +
       '<button class="btn big" data-act="join"' + dis + '>Join</button></div>' +
       (busy ? '<p class="note">' + esc(busy) + '</p>' : '') + (homeErr ? '<p class="err">' + esc(homeErr) + '</p>' : '') +
-      '<ol class="how"><li>A strange fact comes up with the answer missing. Everyone types a believable lie.</li>' +
-      '<li>All the lies appear on every screen, with the real answer hidden among them. Pick the one you think is true.</li>' +
-      '<li>' + FIND + ' points for finding the truth, and ' + FOOL + ' for every friend who falls for your lie.</li>' +
-      '<li>In "About us" rounds the question is about one of you. They tell the truth and everyone else lies about them.</li></ol>'
+      '<div class="or"><span>or on your own</span></div>' +
+      '<button class="btn big" data-act="solo"' + dis + '>Play solo quiz</button>' +
+      '<ol class="how"><li><b>Bluff:</b> a strange fact comes up with the answer missing. Everyone types a believable lie, or takes a ready-made one for half the points.</li>' +
+      '<li>All the lies appear with the real answer hidden among them. ' + FIND + ' points for finding the truth, ' + FOOL + ' for every friend who falls for your lie.</li>' +
+      '<li>With only two of you, the game adds decoys of its own. Pick one and you lose ' + TRAP + ' points.</li>' +
+      '<li>In "About us" questions (three players or more) one of you tells the truth and the rest lie about them.</li>' +
+      '<li><b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.</li></ol>' +
       '</main>';
   }
 
   function lobbyHTML() {
-    const v = view, amHost = v.you === v.hostPid, n = v.players.length;
+    const v = view, amHost = v.you === v.hostPid, n = v.players.length, quiz = v.mode === 'quiz';
     const rounds = [5, 8, 10, 15, 20].map(g => '<option value="' + g + '"' + (g === v.rounds ? ' selected' : '') + '>' + g + '</option>').join('');
-    const modes = Object.keys(MODES).map(k => '<option value="' + k + '"' + (k === v.mode ? ' selected' : '') + '>' + MODES[k] + '</option>').join('');
+    const names = PACK_NAMES.filter(p => !(quiz && p === US));               // "About us" needs lies, so it is not in the quiz
+    const ticked = v.packs.filter(p => names.includes(p));
+    const hasFacts = ticked.some(p => p !== US), need = needPlayers(v.mode, v.solo);
+    const block = n < need ? 'Need ' + (need - n) + ' more player' + (need - n > 1 ? 's' : '')
+      : !ticked.length ? 'Tick a pack first'
+      : !hasFacts && n < 3 ? '"About us" needs 3 players' : '';
+    const settings =
+      (v.solo ? '' : '<label class="field inline"><span>Game</span><select id="mode">' +
+        Object.keys(MODES).map(k => '<option value="' + k + '"' + (k === v.mode ? ' selected' : '') + '>' + MODES[k] + '</option>').join('') + '</select></label>') +
+      '<div class="field"><span>Question packs</span><div class="packs">' + names.map(p =>
+        '<label class="pack"><input type="checkbox" data-pack="' + esc(p) + '"' + (v.packs.includes(p) ? ' checked' : '') + '>' + esc(p) + '<em>' + packSize(p) + '</em></label>').join('') + '</div></div>' +
+      '<label class="field inline"><span>How many</span><select id="rounds">' + rounds + '</select></label>' +
+      '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? 'Start' : 'Start game')) + '</button>';
+    if (v.solo) {
+      const b = bestSolo();
+      return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">You against the facts</div>' +
+        '<p class="note">Four answers, one is true.' + (b ? ' Your best: ' + b.score + ' of ' + b.of + '.' : '') + '</p>' +
+        settings + '<button class="btn" data-act="leave">Back to the start</button></main>';
+    }
     return '<main class="lobby">' +
       '<p class="eyebrow">Room code</p><div class="code">' + esc(v.code) + '</div>' +
       '<button class="btn small" data-act="copy">Copy invite link</button>' +
       '<h2>Players <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
       '<ul class="plist">' + v.players.map(p => '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>host</em>' : '') + (p.pid === v.you ? ' <em>you</em>' : '') + '</li>').join('') + '</ul>' +
       (amHost
-        ? '<label class="field inline"><span>Questions</span><select id="mode">' + modes + '</select></label>' +
-          '<label class="field inline"><span>How many</span><select id="rounds">' + rounds + '</select></label>' +
-          '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
-          (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
+        ? settings +
+          (!quiz && n === 2 ? '<p class="fine">With two players the game adds decoy answers of its own, and "About us" questions are left out.</p>' : '') +
           '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
-        : '<p class="note">Waiting for the host to start. ' + v.rounds + ' questions: ' + MODES[v.mode].toLowerCase() + '.</p>') +
+        : '<p class="note">Waiting for the host to start. ' + (quiz ? 'Quiz' : 'Bluff') + ', ' + v.rounds + ' questions from: ' + esc(ticked.join(', ')) + '.</p>') +
       '</main>';
   }
 
@@ -565,16 +683,18 @@ const KNOWN = 1;
   // The question card. A fact shows its gap, or the truth once it is revealed.
   function questionHTML(truth) {
     const q = view.q;
-    const label = q.kind === 'facts' ? 'Weird fact' : 'About ' + (q.subjectPid === view.you ? 'you' : esc(nameOf(q.subjectPid)));
-    const text = q.kind === 'facts'
-      ? esc(q.text).replace('_____', truth ? '<mark>' + esc(truth) + '</mark>' : '<span class="blank"></span>')
+    const label = q.kind !== 'us' ? esc(q.label || 'Weird fact') : 'About ' + (q.subjectPid === view.you ? 'you' : esc(nameOf(q.subjectPid)));
+    const text = q.kind !== 'us'
+      ? (q.text.includes('_____')
+          ? esc(q.text).replace('_____', truth ? '<mark>' + esc(truth) + '</mark>' : '<span class="blank"></span>')
+          : esc(q.text) + (truth ? ' <mark>' + esc(truth) + '</mark>' : ''))        // a question with no gap: the answer goes after it
       : esc(q.text);
     return '<div class="q"><p>' + label + '</p><h2>' + text + '</h2></div>';
   }
   const nameOf = pid => { const p = view.players.find(x => x.pid === pid); return p ? p.name : 'Someone'; };
 
   function gameHTML() {
-    const v = view, amHost = v.you === v.hostPid, q = v.q;
+    const v = view, amHost = v.you === v.hostPid, q = v.q, quiz = q.kind === 'quiz';
     const iAmSubject = q.subjectPid === v.you, subject = q.subjectPid ? esc(nameOf(q.subjectPid)) : '';
     let body = '', action = '';
 
@@ -584,13 +704,14 @@ const KNOWN = 1;
       if (w.role === 'watch') body += '<p class="status">This question is already going. You can vote when the answers are in.</p>';
       else if (w.mine !== null) {
         body += '<p class="status">Handed in. Waiting on ' + people(w.waiting) + '.</p>' +
-          '<p class="mine">' + (w.role === 'truth' ? 'Your truth' : 'Your lie') + ': <b>' + esc(w.mine) + '</b></p>';
+          '<p class="mine">' + (w.role === 'truth' ? 'Your truth' : w.canned ? 'Your ready-made lie (half points)' : 'Your lie') + ': <b>' + esc(w.mine) + '</b></p>';
       } else {
         body += '<p class="status">' + (w.role === 'truth' ? 'Tell the truth. Everyone else is busy lying about you.' : q.kind === 'facts' ? 'Write a lie that sounds true.' : 'Make up an answer that sounds like ' + subject + '.') + '</p>' +
           '<input id="answer" maxlength="' + MAX_LEN + '" autocomplete="off" placeholder="' + (w.role === 'truth' ? 'The honest answer' : 'Your most convincing lie') + '" value="' + esc(draft) + '">' +
           '<p class="err" id="nope">' + esc(nope) + '</p>' +
           '<p class="tip">' + (w.role === 'truth' ? 'Keep it short. Your friends will have to pick it out from the lies.' : 'Keep it short and plausible. You score when friends pick it.') + '</p>';
-        action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? 'Lock in the truth' : 'Hand in my lie') + '</button>';
+        action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? 'Lock in the truth' : 'Hand in my lie') + '</button>' +
+          (w.role === 'lie' && w.canSuggest ? '<button class="btn" data-act="canned">Give me a lie (half points)</button>' : '');
       }
       if (amHost && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">Carry on without them</button>';
     } else {
@@ -598,34 +719,49 @@ const KNOWN = 1;
       const truth = done ? (m.options.find(o => o.truth) || {}).text : null;
       const canPick = !done && !iAmSubject && m.myVote === null;
       const names = list => list.map(p => esc(nameOf(p))).join(', ');
+      const right = m.myVote !== null && m.options[m.myVote] && m.options[m.myVote].truth;
       body = questionHTML(truth) +
-        '<p class="status">' + (done ? (q.kind === 'facts' ? 'The truth is out.' : 'The truth about ' + (iAmSubject ? 'you' : subject) + '.')
+        '<p class="status">' + (done
+            ? (v.solo ? (right ? 'Correct!' + (v.streak > 1 ? ' That is ' + v.streak + ' in a row.' : '') : 'Not this time.')
+              : q.kind === 'us' ? 'The truth about ' + (iAmSubject ? 'you' : subject) + '.' : 'The truth is out.')
           : iAmSubject ? 'Your friends are working out which one is really you. Waiting on ' + people(m.waiting) + '.'
-          : canPick ? 'Which one is the truth?'
+          : canPick ? (quiz ? 'Which one is true?' : 'Which one is the truth?')
           : 'Vote is in. Waiting on ' + people(m.waiting) + '.') + '</p>' +
         '<div class="opts">' + m.options.map((o, i) => {
           if (done) {
             const who = o.truth ? '<b>The truth</b>' + (o.authors.length ? ' · ' + names(o.authors) + ' wrote it by accident' : '')
-              : '<b>' + names(o.authors) + '\'s lie</b>';
-            const picked = o.pickers.length ? (o.truth ? ' · found by ' : ' · fooled ') + names(o.pickers) : o.truth ? ' · nobody found it' : '';
-            return '<div class="opt' + (o.truth ? ' truth' : '') + '">' + esc(o.text) + '<small>' + who + picked + '</small></div>';
+              : o.house ? (quiz ? '' : '<b>A trap set by the game</b>')
+              : '<b>' + names(o.authors) + '\'s lie</b>' + (o.readyMade ? ' (ready-made)' : '');
+            const picked = v.solo ? (o.pickers.length ? 'your pick' : '')
+              : o.pickers.length ? (o.truth ? 'found by ' : o.house ? (quiz ? 'picked by ' : 'caught ') : 'fooled ') + names(o.pickers)
+              : o.truth ? 'nobody found it' : '';
+            const note = [who, picked].filter(Boolean).join(' · ');
+            return '<div class="opt' + (o.truth ? ' truth' : o.pickers.length && (o.house || v.solo) ? ' trap' : '') + '">' + esc(o.text) + (note ? '<small>' + note + '</small>' : '') + '</div>';
           }
           return '<button class="opt' + (m.myVote === i ? ' sel' : '') + '" data-act="vote" data-i="' + i + '"' + (canPick && !o.own ? '' : ' disabled') + '>' +
             esc(o.text) + (o.own ? '<small>your lie</small>' : '') + '</button>';
         }).join('') + '</div>';
       if (done) {
-        const got = v.players.filter(p => p.gain > 0).sort((a, b) => b.gain - a.gain);
-        body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b>+' + p.gain + '</b></li>').join('') : '<li>Nobody scored. Impressive.</li>') + '</ul>';
-        if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? 'See final scores' : 'Next question') + '</button>';
+        const got = v.players.filter(p => p.gain !== 0).sort((a, b) => b.gain - a.gain);
+        if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b class="' + (p.gain < 0 ? 'neg' : '') + '">' + (p.gain < 0 ? '−' : '+') + Math.abs(p.gain) + '</b></li>').join('') : '<li>Nobody scored. Impressive.</li>') + '</ul>';
+        if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? (v.solo ? 'See how you did' : 'See final scores') : 'Next question') + '</button>';
       } else if (amHost && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">Show the answer now</button>';
     }
 
-    return '<header class="bar"><span>Room <b>' + esc(v.code) + '</b></span><span>Question ' + v.round + ' of ' + v.rounds + '</span></header>' +
+    return '<header class="bar"><span>' + (v.solo ? 'Solo quiz' : 'Room <b>' + esc(v.code) + '</b>') + '</span><span>Question ' + v.round + ' of ' + v.rounds + '</span></header>' +
       scoresHTML() + '<main class="stage">' + body + '<div class="action">' + action + '</div></main>';
   }
 
   function overHTML() {
     const v = view, amHost = v.you === v.hostPid;
+    if (v.solo) {
+      const score = v.players[0].score, pct = score / v.rounds, b = bestSolo();
+      return '<main class="lobby"><p class="eyebrow">Solo quiz</p><div class="code small">' + score + ' of ' + v.rounds + '</div>' +
+        '<p class="note">' + (pct === 1 ? 'Flawless. Suspicious, even.' : pct >= 0.7 ? 'Sharp. The facts are worried.' : pct >= 0.4 ? 'Respectable. The facts put up a fight.' : 'The facts win this one.') +
+        (b ? ' Your best is ' + b.score + ' of ' + b.of + '.' : '') + '</p>' +
+        '<button class="btn primary big" data-act="start">Play again</button>' +
+        '<button class="btn" data-act="lobby">Change packs</button><button class="btn" data-act="leave">Back to the start</button></main>';
+    }
     const ranked = v.players.slice().sort((a, b) => b.score - a.score);
     // Everyone on the top score shares the win, and equal scores share a place.
     const winners = ranked.filter(p => p.score === ranked[0].score).map(p => esc(p.name));
@@ -633,11 +769,11 @@ const KNOWN = 1;
       : (winners.length === ranked.length && ranked.length > 2) ? 'Everyone ties'
       : winners.slice(0, -1).join(', ') + ' and ' + winners[winners.length - 1] + ' tie';
     const place = p => ranked.findIndex(x => x.score === p.score) + 1;
-    return '<main class="lobby"><p class="eyebrow">Best liar</p><div class="code small">' + headline + '</div>' +
+    return '<main class="lobby"><p class="eyebrow">' + (v.mode === 'quiz' ? 'Top of the class' : 'Best liar') + '</p><div class="code small">' + headline + '</div>' +
       '<ul class="plist rank">' + ranked.map(p =>
         '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + '</b></li>').join('') + '</ul>' +
       (amHost
-        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < MIN_PLAYERS ? ' disabled' : '') + '>Play again</button>' +
+        ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < needPlayers(v.mode, v.solo) ? ' disabled' : '') + '>Play again</button>' +
           '<button class="btn" data-act="lobby">Back to lobby</button>'
         : '<p class="note">Waiting for the host to start another game.</p>') + '</main>';
   }
@@ -662,6 +798,7 @@ const KNOWN = 1;
   $app.addEventListener('change', e => {
     if (e.target.id === 'rounds') act({ t: 'rounds', rounds: e.target.value });
     if (e.target.id === 'mode') { save('localStorage', 'bfl_mode', e.target.value); act({ t: 'mode', mode: e.target.value }); }
+    if (e.target.dataset.pack) act({ t: 'pack', name: e.target.dataset.pack, on: e.target.checked });
   });
   $app.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || e.isComposing) return;
@@ -693,7 +830,9 @@ const KNOWN = 1;
       }
       case 'start': act({ t: 'start' }); break;
       case 'lobby': act({ t: 'lobby' }); break;
+      case 'solo': startSolo(); break;
       case 'write': if (draft.trim()) act({ t: 'write', text: draft }); break;
+      case 'canned': act({ t: 'write', canned: true }); break;
       case 'vote': act({ t: 'vote', i: parseInt(el.dataset.i, 10) }); break;
       case 'skip': act({ t: 'skip' }); break;
       case 'next': act({ t: 'next' }); break;
