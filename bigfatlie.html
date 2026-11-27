@@ -281,8 +281,6 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   let busy = '', homeErr = '', lost = false, joinTimer = null;
   let draft = '', nope = '', selKey = '';
   let race = null;     // my own progress in a timed quiz: { id, i, score, ms, picked, t0 }
-  const PING_MS = 2500, SILENT_MS = 9000;      // how often a guest says "still here", and how long the host waits before giving up on them
-  let heartbeat = null, watchdog = null;
   let uiLang = load('localStorage', 'bfl_lang') === 'th' ? 'th' : 'en';     // the language of MY screen. Each player picks their own, at any time.
   const lang = () => uiLang;
   const roomLang = () => DATA[uiLang] ? uiLang : 'en';                     // a new room asks its questions in the host's language to begin with
@@ -330,28 +328,14 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       sync();
     });
     peer.on('connection', conn => {
-      conn.seen = Date.now();
       conn.on('data', msg => {
         if (!G || !msg || typeof msg !== 'object') return;
-        conn.seen = Date.now();
         if (msg.t === 'join') hostJoin(conn, msg);
-        else if (msg.t === 'bye') hostLeave(conn);                       // they closed the tab
-        else if (msg.t === 'ping') {                                  // "still here". If we had given up on them, let them back in.
-          const p = conn.pid && P(conn.pid);
-          if (!p || !p.connected || p.conn !== conn) hostJoin(conn, msg);
-        }
         else if (conn.pid) handle(conn.pid, msg);
       });
       conn.on('close', () => hostLeave(conn));
       conn.on('error', () => hostLeave(conn));
     });
-    // A closed tab does not always say goodbye. Every guest sends a small "still here" every few seconds;
-    // anyone silent for SILENT_MS is treated as gone: out of the lobby, or not waited for during a game.
-    clearInterval(watchdog);
-    watchdog = setInterval(() => {
-      if (!G) return;
-      G.players.slice().forEach(p => { if (p.conn && Date.now() - (p.conn.seen || 0) > SILENT_MS) hostLeave(p.conn); });
-    }, 2000);
     peer.on('error', err => {
       if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
       else if (!G) { peer.destroy(); busy = ''; homeErr = t('Could not reach the connection server. Check your internet and try again.'); render(); }
@@ -730,11 +714,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function connectHost() {
     const conn = peer.connect(PREFIX + roomCode, { reliable: true });
     hostConn = conn;
-    conn.on('open', () => {
-      conn.send({ t: 'join', pid: myPid, name: myName });
-      clearInterval(heartbeat);
-      heartbeat = setInterval(stillHere, PING_MS);
-    });
+    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
     conn.on('data', msg => {
       if (!msg || conn !== hostConn) return;
       if (msg.t === 'state') {
@@ -748,9 +728,6 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(true); } });
   }
 
-  // Tell the host I am still here. (If the host had given up on me, this also gets me back in.)
-  function stillHere() { if (hostConn && hostConn.open) { try { hostConn.send({ t: 'ping', pid: myPid, name: myName }); } catch (e) {} } }
-
   function onMsg(msg) {
     if (msg.t === 'toast') toast(msg.k ? t(msg.k, ...(msg.a || [])) : msg.text);
     else if (msg.t === 'nope') {                // I typed the real answer by accident
@@ -760,7 +737,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   }
 
   function joinFail(text) {
-    clearTimeout(joinTimer); clearInterval(heartbeat);
+    clearTimeout(joinTimer);
     if (peer) { try { peer.destroy(); } catch (e) {} }
     peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
     render();
@@ -1128,11 +1105,6 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const el = document.getElementById('clock');
     if (el && race && view && view.phase === 'race' && race.picked === null) el.textContent = clock(race.ms + Date.now() - race.t0);
   }, 100);
-
-  // Closing or leaving the page: say goodbye so the host does not have to work it out.
-  window.addEventListener('pagehide', () => { if (!isHost && hostConn && hostConn.open) { try { hostConn.send({ t: 'bye' }); } catch (e) {} } });
-  // Coming back to the tab (a phone waking up, say): check in straight away.
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && !isHost) stillHere(); });
 
   window.addEventListener('beforeunload', e => {
     if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
