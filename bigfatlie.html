@@ -88,6 +88,9 @@ input::placeholder { color: #aaa397; font-weight: 400; }
 .plist li { padding: 12px 14px; background: var(--panel); border-radius: 12px; margin-top: 8px; font-weight: 700; }
 .plist em { font-style: normal; font-weight: 400; font-size: .8rem; color: var(--dim); margin-left: 6px; }
 .plist.rank li { display: flex; justify-content: space-between; }
+.plist li:has(.kick) { display: flex; align-items: center; }
+.kick { margin-left: auto; appearance: none; border: 2px solid var(--line); background: var(--field); border-radius: 999px; padding: 3px 11px; font-size: .78rem; font-weight: 700; color: var(--dim); cursor: pointer; }
+.kick:hover { border-color: var(--lie); color: var(--lie); }
 .plist.rank li.top { background: var(--accent); color: #fff; }
 
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
@@ -243,7 +246,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     'Could not reach the connection server. Check your internet and try again.': 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่',
     'Could not find that room. Check the code and make sure the host still has the game open.': 'ไม่เจอห้องนี้ ตรวจรหัสอีกครั้ง และดูว่าเจ้าของห้องยังเปิดเกมอยู่',
     'No room with that code. Check it and try again.': 'ไม่มีห้องที่ใช้รหัสนี้ ตรวจแล้วลองใหม่', 'Connection problem. Check your internet and try again.': 'การเชื่อมต่อมีปัญหา ตรวจอินเทอร์เน็ตแล้วลองใหม่',
-    'That room is full.': 'ห้องเต็มแล้ว', '{0} left before telling the truth. Next question.': '{0} ออกไปก่อนจะตอบความจริง ข้ามไปข้อต่อไป',
+    'That room is full.': 'ห้องเต็มแล้ว', 'The host removed you from the room.': 'เจ้าของห้องนำคุณออกจากห้องแล้ว', 'Remove': 'นำออก', 'Remove {0}': 'นำ {0} ออก', '{0} left before telling the truth. Next question.': '{0} ออกไปก่อนจะตอบความจริง ข้ามไปข้อต่อไป',
     'Tick a pack of facts first.': 'เลือกชุดคำถามความรู้ก่อน', 'Not enough players left. Back to the lobby.': 'ผู้เล่นเหลือไม่พอ กลับไปที่ห้องรอ',
     'Nothing to ask with these packs and this many players.': 'ชุดคำถามที่เลือกกับจำนวนคนเท่านี้ ไม่มีข้อไหนถามได้',
     'No ready-made lie for this one. Write your own.': 'ข้อนี้ไม่มีคำโกหกสำเร็จรูป แต่งเองนะ', 'That is the real answer! Write a lie instead.': 'นั่นมันคำตอบจริง! แต่งเรื่องโกหกแทนสิ',
@@ -278,6 +281,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   let busy = '', homeErr = '', lost = false, joinTimer = null;
   let draft = '', nope = '', selKey = '';
   let race = null;     // my own progress in a timed quiz: { id, i, score, ms, picked, t0 }
+  const PING_MS = 2500, SILENT_MS = 9000;      // how often a guest says "still here", and how long the host waits before giving up on them
+  let heartbeat = null, watchdog = null;
   let uiLang = load('localStorage', 'bfl_lang') === 'th' ? 'th' : 'en';     // the language of MY screen. Each player picks their own, at any time.
   const lang = () => uiLang;
   const roomLang = () => DATA[uiLang] ? uiLang : 'en';                     // a new room asks its questions in the host's language to begin with
@@ -319,20 +324,34 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         streak: 0, canned: {}, rounds: 8, lang: roomLang(), packs: savedPacks(roomLang()),
         round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
-        q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
+        q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null, kicked: []
       };
       setRoomUrl(code);
       sync();
     });
     peer.on('connection', conn => {
+      conn.seen = Date.now();
       conn.on('data', msg => {
         if (!G || !msg || typeof msg !== 'object') return;
+        conn.seen = Date.now();
         if (msg.t === 'join') hostJoin(conn, msg);
+        else if (msg.t === 'bye') hostLeave(conn);                       // they closed the tab
+        else if (msg.t === 'ping') {                                  // "still here". If we had given up on them, let them back in.
+          const p = conn.pid && P(conn.pid);
+          if (!p || !p.connected || p.conn !== conn) hostJoin(conn, msg);
+        }
         else if (conn.pid) handle(conn.pid, msg);
       });
       conn.on('close', () => hostLeave(conn));
       conn.on('error', () => hostLeave(conn));
     });
+    // A closed tab does not always say goodbye. Every guest sends a small "still here" every few seconds;
+    // anyone silent for SILENT_MS is treated as gone: out of the lobby, or not waited for during a game.
+    clearInterval(watchdog);
+    watchdog = setInterval(() => {
+      if (!G) return;
+      G.players.slice().forEach(p => { if (p.conn && Date.now() - (p.conn.seen || 0) > SILENT_MS) hostLeave(p.conn); });
+    }, 2000);
     peer.on('error', err => {
       if (err.type === 'unavailable-id') { peer.destroy(); createRoom(); }
       else if (!G) { peer.destroy(); busy = ''; homeErr = t('Could not reach the connection server. Check your internet and try again.'); render(); }
@@ -348,7 +367,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
       round: 0, hostPid: myPid,
       players: [{ pid: myPid, name: myName.trim() || t('You'), score: 0, gain: 0, conn: null, connected: true }],
-      q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
+      q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null, kicked: []
     };
     sync();
   }
@@ -364,6 +383,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       p.conn = conn; p.connected = true; p.name = name;
       if (old && old !== conn) { try { old.close(); } catch (e) {} }
     } else {
+      if (G.kicked.includes(pid)) { conn.send({ t: 'kicked' }); return; }             // removed by the host: not let back into this room
       if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
       G.players.push({ pid, name, score: 0, gain: 0, conn, connected: true });
     }
@@ -560,6 +580,16 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'timed':
         if (amHost && G.phase === 'lobby') { G.timed = !!msg.on; sync(); }
         break;
+      case 'kick': {                            // host, in the lobby: remove a player from the room
+        const out = P(String(msg.pid));
+        if (!amHost || G.phase !== 'lobby' || !out || out.pid === G.hostPid) return;
+        G.kicked.push(out.pid);
+        G.players = G.players.filter(x => x !== out);
+        const c = out.conn; out.conn = null;
+        if (c) { try { c.send({ t: 'kicked' }); } catch (e) {} setTimeout(() => { try { c.close(); } catch (e) {} }, 300); }
+        sync();
+        break;
+      }
       case 'allowskip':
         if (amHost && G.phase === 'lobby') { G.skip = !!msg.on; sync(); }
         break;
@@ -700,7 +730,11 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function connectHost() {
     const conn = peer.connect(PREFIX + roomCode, { reliable: true });
     hostConn = conn;
-    conn.on('open', () => conn.send({ t: 'join', pid: myPid, name: myName }));
+    conn.on('open', () => {
+      conn.send({ t: 'join', pid: myPid, name: myName });
+      clearInterval(heartbeat);
+      heartbeat = setInterval(stillHere, PING_MS);
+    });
     conn.on('data', msg => {
       if (!msg || conn !== hostConn) return;
       if (msg.t === 'state') {
@@ -708,10 +742,14 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         if (!view) setRoomUrl(roomCode);
         view = msg.v; render(was);
       } else if (msg.t === 'full') joinFail(t('That room is full.'));
+      else if (msg.t === 'kicked') { hostConn = null; joinFail(t('The host removed you from the room.')); }
       else onMsg(msg);
     });
     conn.on('close', () => { if (conn === hostConn && view) { lost = true; render(true); } });
   }
+
+  // Tell the host I am still here. (If the host had given up on me, this also gets me back in.)
+  function stillHere() { if (hostConn && hostConn.open) { try { hostConn.send({ t: 'ping', pid: myPid, name: myName }); } catch (e) {} } }
 
   function onMsg(msg) {
     if (msg.t === 'toast') toast(msg.k ? t(msg.k, ...(msg.a || [])) : msg.text);
@@ -722,7 +760,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   }
 
   function joinFail(text) {
-    clearTimeout(joinTimer);
+    clearTimeout(joinTimer); clearInterval(heartbeat);
     if (peer) { try { peer.destroy(); } catch (e) {} }
     peer = null; hostConn = null; view = null; busy = ''; homeErr = text;
     render();
@@ -839,7 +877,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<p class="eyebrow">' + t('Room code') + '</p><div class="code">' + esc(v.code) + '</div>' +
       '<button class="btn small" data-act="copy">' + t('Copy invite link') + '</button>' +
       '<h2>' + t('Players') + ' <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
-      '<ul class="plist">' + v.players.map(p => '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>' + t('host') + '</em>' : '') + (p.pid === v.you ? ' <em>' + t('you') + '</em>' : '') + '</li>').join('') + '</ul>' +
+      '<ul class="plist">' + v.players.map(p => '<li>' + esc(p.name) + (p.pid === v.hostPid ? ' <em>' + t('host') + '</em>' : '') + (p.pid === v.you ? ' <em>' + t('you') + '</em>' : '') +
+        (amHost && p.pid !== v.hostPid ? '<button class="kick" data-act="kick" data-pid="' + esc(p.pid) + '" aria-label="' + t('Remove {0}', esc(p.name)) + '">' + t('Remove') + '</button>' : '') + '</li>').join('') + '</ul>' +
       (amHost
         ? settings +
           (!quiz && n === 2 ? '<p class="fine">' + t('With two players the game adds decoy answers of its own, and "About us" questions are left out.') + '</p>' : '') +
@@ -1051,6 +1090,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         render(true);
         break;
       case 'qlang': act({ t: 'lang', lang: el.dataset.l }); break;      // host: which language the questions are in
+      case 'kick': act({ t: 'kick', pid: el.dataset.pid }); break;
       case 'start': act({ t: 'start' }); break;
       case 'lobby': act({ t: 'lobby' }); break;
       case 'solo': startSolo(); break;
@@ -1088,6 +1128,11 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const el = document.getElementById('clock');
     if (el && race && view && view.phase === 'race' && race.picked === null) el.textContent = clock(race.ms + Date.now() - race.t0);
   }, 100);
+
+  // Closing or leaving the page: say goodbye so the host does not have to work it out.
+  window.addEventListener('pagehide', () => { if (!isHost && hostConn && hostConn.open) { try { hostConn.send({ t: 'bye' }); } catch (e) {} } });
+  // Coming back to the tab (a phone waking up, say): check in straight away.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !isHost) stillHere(); });
 
   window.addEventListener('beforeunload', e => {
     if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
