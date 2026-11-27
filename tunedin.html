@@ -520,7 +520,7 @@ const PACKS = {
     ["Nightmare job", "Dream job"],
     ["Could do it in my sleep", "Would need a year of training"],
     ["Born with it", "Had to learn it"],
-    ["Real sport", "Just a hobby"],
+    ["Boring hobby", "Interesting hobby"],
     ["Down to skill", "Down to luck"],
     ["Rip-off", "Bargain"],
     ["Impulse buy", "Saved up for it"],
@@ -542,7 +542,7 @@ const PACKS = {
     ["Good first impression", "Bad first impression"],
     ["Lives in my head rent-free", "Forgot it existed"],
     ["Background extra", "Main character"],
-    ["Zombie apocalypse liability", "Zombie apocalypse asset"],
+    ["Dies first in zombie apocalypse", "Survives zombie apocalypse"],
     ["Would lose the fight", "Would win the fight"],
     ["Name for a pet", "Name for a baby"],
     ["Makes me feel young", "Makes me feel old"],
@@ -559,6 +559,14 @@ const PACKS = {
   ],
 
   "Spicy": [
+    ["Unsexy accent", "Sexy accent"],
+    ["Unkissable", "Very kissable"],
+    ["Lights on", "Lights off"],
+    ["Sexy nickname", "Call me that again and I leave"],
+    ["Would cancel plans for", "Would fake being sick to avoid"],
+    ["In my wedding party", "Not even invited"],
+    ["Quickie", "All night"],
+    ["I'm in charge", "Tell me what to do"],
     ["Hear me out", "Sit down and listen"],
     ["Wholesome", "Filthy"],
     ["Vanilla", "Kinky"],
@@ -573,6 +581,7 @@ const PACKS = {
     ["Would kiss", "Would rather die"],
     ["Hear me out", "Absolutely not"],
     ["Flirty", "Creepy"],
+    ["Would flirt", "Would ghost"],
     ["Romantic", "Stalker behaviour"],
     ["Cute jealous", "Scary jealous"],
     ["Adorable quirk", "Toxic trait"],
@@ -661,6 +670,7 @@ const SCALES = [].concat(...Object.values(PACKS));
         code, phase: 'lobby', laps: 2,
         giverScores: load('localStorage', 'ti_gscore') !== '0',     // lobby settings start as the host last left them
         live: load('localStorage', 'ti_live') === '1',
+        skip: load('localStorage', 'ti_skip') === '1',           // may the round be revealed before everyone has locked in?
         pack: PACKS[load('localStorage', 'ti_pack')] ? load('localStorage', 'ti_pack') : '',     // '' means Mixed
         total: 0, round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, guess: null, pos: null, pts: 0, conn: null, connected: true }],
@@ -795,6 +805,9 @@ const SCALES = [].concat(...Object.values(PACKS));
       case 'watch':
         if (amHost && G.phase === 'lobby') { G.live = !!msg.on; sync(); }
         break;
+      case 'skip':
+        if (amHost && G.phase === 'lobby') { G.skip = !!msg.on; sync(); }
+        break;
       case 'pos': {                             // a guesser's slider moved: pass it on to the clue giver only
         const n = Math.round(Number(msg.pos));
         if (!G.live || G.phase !== 'clue' || amGiver || p.guess !== null || !(n >= 0 && n <= 100)) return;
@@ -819,8 +832,8 @@ const SCALES = [].concat(...Object.values(PACKS));
         sync();
         break;
       }
-      case 'reveal':                            // don't wait for stragglers
-        if (G.phase === 'clue' && (amGiver || amHost) && G.players.some(x => x.guess !== null)) { reveal(); sync(); }
+      case 'reveal':                            // don't wait for stragglers. Only if the room allows skipping.
+        if (G.skip && G.phase === 'clue' && (amGiver || amHost) && G.players.some(x => x.guess !== null)) { reveal(); sync(); }
         break;
       case 'next':
         if (G.phase === 'reveal' && (amHost || amGiver)) nextRound();
@@ -839,7 +852,7 @@ const SCALES = [].concat(...Object.values(PACKS));
     const me = P(pid), open = G.phase === 'reveal';
     const watch = G.live && G.phase === 'clue' && pid === G.giverPid;   // only the clue giver gets slider positions
     return {
-      code: G.code, phase: G.phase, laps: G.laps, giverScores: G.giverScores, live: G.live, pack: G.pack, total: G.total, round: G.round,
+      code: G.code, phase: G.phase, laps: G.laps, giverScores: G.giverScores, live: G.live, skip: !!G.skip, pack: G.pack, total: G.total, round: G.round,
       you: pid, hostPid: G.hostPid, giverPid: G.giverPid, scale: G.scale,
       target: (open || pid === G.giverPid) ? G.target : null,
       gain: G.gain, myGuess: me ? me.guess : null,
@@ -1062,13 +1075,16 @@ const SCALES = [].concat(...Object.values(PACKS));
           '<label class="field inline"><span>Guesses</span><select id="watch">' +
           '<option value="0"' + (v.live ? '' : ' selected') + '>Hidden until the reveal</option>' +
           '<option value="1"' + (v.live ? ' selected' : '') + '>Clue giver sees them live</option></select></label>' +
+          '<label class="field inline"><span>Skipping</span><select id="skip">' +
+          '<option value="0"' + (v.skip ? '' : ' selected') + '>No, wait for everyone</option>' +
+          '<option value="1"' + (v.skip ? ' selected' : '') + '>Allowed</option></select></label>' +
           '<button class="btn primary big" data-act="start"' + (n < MIN_PLAYERS ? ' disabled' : '') + '>' +
           (n < MIN_PLAYERS ? 'Need ' + (MIN_PLAYERS - n) + ' more player' + (MIN_PLAYERS - n > 1 ? 's' : '') : 'Start game') + '</button>' +
           '<p class="fine">Keep this tab open. You are hosting, so the room closes if you leave.</p>'
         : '<p class="note">Waiting for the host to start. Everyone gives ' + v.laps + ' clue' + (v.laps > 1 ? 's' : '') + '. ' +
           (v.giverScores ? 'The clue giver scores the average of the guesses.' : 'Only guessers score.') + ' ' +
           (v.live ? 'The clue giver can watch the sliders live.' : 'Guesses are hidden until the reveal.') +
-          ' Scales: ' + (v.pack ? esc(v.pack) : 'Mixed') + '.</p>') +
+          ' Scales: ' + (v.pack ? esc(v.pack) : 'Mixed') + '.' + (v.skip ? ' Skipping is allowed.' : '') + '</p>') +
       '</main>';
   }
 
@@ -1122,11 +1138,12 @@ const SCALES = [].concat(...Object.values(PACKS));
           scaleHTML(v.target, v.live ? v.players.filter(p => typeof p.pos === 'number').map(p =>
             ({ pos: p.pos, pid: p.pid, ghost: !p.done, label: p.name + (p.done ? ' ✓' : '') })) : []) + legend;
         action = (locked === 0 ? '<button class="btn" data-act="swap">Different scale</button>' : '') +
-          '<button class="btn primary big" data-act="reveal"' + (locked ? '' : ' disabled') + '>Reveal (' + locked + ' of ' + guessers.length + ' locked in)</button>';
+          (v.skip ? '<button class="btn primary big" data-act="reveal"' + (locked ? '' : ' disabled') + '>Reveal (' + locked + ' of ' + guessers.length + ' locked in)</button>'
+            : '<button class="btn primary big" disabled>' + locked + ' of ' + guessers.length + ' locked in</button>');     // no skipping: it reveals by itself when everyone is in
       } else if (v.myGuess !== null) {
         body = '<p class="status">Locked in. Waiting on ' + (guessers.length - locked) + ' more.</p>' +
           scaleHTML(null, [{ pos: v.myGuess, me: true, label: 'You' }]);
-        if (amHost) action = '<button class="btn" data-act="reveal">Reveal now</button>';
+        if (amHost && v.skip) action = '<button class="btn" data-act="reveal">Reveal now</button>';
       } else {
         body = '<p class="status">Listen to ' + giver + '\'s clue. Where on the scale does it sit for them?</p>' +
           '<p class="tip">Talk it over, then slide and lock in. ' + (v.live
@@ -1210,6 +1227,7 @@ const SCALES = [].concat(...Object.values(PACKS));
     }
   });
   $app.addEventListener('change', e => {
+    if (e.target.id === 'skip') { save('localStorage', 'ti_skip', e.target.value); act({ t: 'skip', on: e.target.value === '1' }); }
     if (e.target.id === 'gscore') { save('localStorage', 'ti_gscore', e.target.value); act({ t: 'giverScores', on: e.target.value === '1' }); }
     if (e.target.id === 'pack') { save('localStorage', 'ti_pack', e.target.value); act({ t: 'pack', pack: e.target.value }); }
     if (e.target.id === 'watch') { save('localStorage', 'ti_live', e.target.value); act({ t: 'watch', on: e.target.value === '1' }); }

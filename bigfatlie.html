@@ -72,11 +72,14 @@ input::placeholder { color: #aaa397; font-weight: 400; }
 .code.small { font-size: 2rem; letter-spacing: 0; line-height: 1.2; }
 .lobby h2 { margin: 20px 0 0; font-size: 1.1rem; text-align: left; }
 .packs { display: grid; gap: 6px; }
-.lang { display: inline-flex; align-self: flex-end; background: var(--panel); border-radius: 999px; padding: 3px; gap: 2px; }
+.lang { display: inline-flex; width: fit-content; flex: none; align-self: flex-end; background: var(--panel); border-radius: 999px; padding: 3px; gap: 2px; }
 .lang button { appearance: none; border: 0; background: none; border-radius: 999px; padding: 5px 13px; font-weight: 700; font-size: .85rem; color: var(--dim); cursor: pointer; }
 .lang button.on { background: var(--field); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
 .lang button:disabled { cursor: default; }
 .field.inline .lang { align-self: center; }
+.bar .lang { flex: none; margin-left: 10px; padding: 2px; }
+.bar .lang button { padding: 2px 9px; font-size: .75rem; }
+.bar > span:first-child { margin-right: auto; }
 .pack, .tick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--panel); border-radius: 12px; font-weight: 700; text-align: left; cursor: pointer; }
 .pack input, .tick input { flex: none; width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
 .pack em, .tick em { margin-left: auto; font-style: normal; font-weight: 400; font-size: .85rem; color: var(--dim); }
@@ -87,7 +90,7 @@ input::placeholder { color: #aaa397; font-weight: 400; }
 .plist.rank li { display: flex; justify-content: space-between; }
 .plist.rank li.top { background: var(--accent); color: #fff; }
 
-.bar { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; font-size: .85rem; color: var(--dim); border-bottom: 1px solid var(--line); }
 .bar b { color: var(--accent); letter-spacing: .1em; }
 .scores { list-style: none; margin: 0; padding: 12px 20px; display: flex; gap: 8px; overflow-x: auto; }
 .scores li { flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 2px solid transparent; border-radius: 999px; padding: 5px 7px 5px 13px; font-size: .9rem; }
@@ -196,8 +199,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<b>โหมดควิซ:</b> ไม่ต้องโกหก มีสี่ตัวเลือก ถูกแค่ข้อเดียว เล่นกับเพื่อนหรือเล่นคนเดียวก็ได้',
     'Need 1 more player': 'ขาดอีก 1 คน', 'Need {0} more players': 'ขาดอีก {0} คน', 'Tick a pack first': 'เลือกชุดคำถามก่อน',
     '"About us" needs 3 players': '"เรื่องของพวกเรา" ต้องมี 3 คน',
-    'Language': 'ภาษา', 'Game': 'โหมด', 'Bluff: write lies': 'โกหก: แต่งคำตอบหลอก', 'Quiz: just pick the answer': 'ควิซ: เลือกคำตอบอย่างเดียว',
-    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
+    'Questions in': 'คำถามเป็นภาษา', 'Game': 'โหมด', 'Bluff: write lies': 'โกหก: แต่งคำตอบหลอก', 'Quiz: just pick the answer': 'ควิซ: เลือกคำตอบอย่างเดียว',
+    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Allow skipping': 'อนุญาตให้ข้าม', 'host can carry on without waiting': 'เจ้าของห้องไปต่อได้โดยไม่ต้องรอ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
     'Start': 'เริ่ม', 'Start game': 'เริ่มเกม', 'Solo quiz': 'ควิซคนเดียว', 'You against the facts': 'คุณ ปะทะ ข้อเท็จจริง',
     'Four answers, one is true.': 'สี่ตัวเลือก ถูกแค่ข้อเดียว', ' Your best: {0}.': ' สถิติดีที่สุด: {0}', 'Back to the start': 'กลับหน้าแรก',
     'Copy invite link': 'คัดลอกลิงก์ชวนเพื่อน', 'Players': 'ผู้เล่น', 'host': 'เจ้าของห้อง', 'you': 'คุณ',
@@ -275,8 +278,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   let busy = '', homeErr = '', lost = false, joinTimer = null;
   let draft = '', nope = '', selKey = '';
   let race = null;     // my own progress in a timed quiz: { id, i, score, ms, picked, t0 }
-  let uiLang = DATA.th && load('localStorage', 'bfl_lang') === 'th' ? 'th' : 'en';     // my language until I am in a room
-  const lang = () => view && DATA[view.lang] ? view.lang : uiLang;                    // in a room, the room's language
+  let uiLang = load('localStorage', 'bfl_lang') === 'th' ? 'th' : 'en';     // the language of MY screen. Each player picks their own, at any time.
+  const lang = () => uiLang;
+  const roomLang = () => DATA[uiLang] ? uiLang : 'en';                     // a new room asks its questions in the host's language to begin with
   const t = (s, ...a) => ((lang() === 'th' && TH_UI[s]) || s).replace(/\{(\d)\}/g, (m, i) => a[i]);
 
   // The packs the host ticked last time, or all of them.
@@ -311,7 +315,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       G = {
         code, phase: 'lobby', solo: false, mode: load('localStorage', 'bfl_mode') === 'quiz' ? 'quiz' : 'bluff',
         timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
-        streak: 0, canned: {}, rounds: 8, lang: uiLang, packs: savedPacks(uiLang),
+        skip: load('localStorage', 'bfl_skip') === '1',      // may the host carry on without waiting for everyone?
+        streak: 0, canned: {}, rounds: 8, lang: roomLang(), packs: savedPacks(roomLang()),
         round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
         q: null, writers: [], subs: {}, options: [], votes: {}, decks: { facts: [], us: [] }, pool: [], lastSubject: null
@@ -339,7 +344,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function startSolo() {
     isHost = true;
     G = {
-      code: '', phase: 'lobby', solo: true, mode: 'quiz', streak: 0, canned: {}, rounds: 10, lang: uiLang, packs: savedPacks(uiLang),
+      code: '', phase: 'lobby', solo: true, skip: false, mode: 'quiz', streak: 0, canned: {}, rounds: 10, lang: roomLang(), packs: savedPacks(roomLang()),
       timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
       round: 0, hostPid: myPid,
       players: [{ pid: myPid, name: myName.trim() || t('You'), score: 0, gain: 0, conn: null, connected: true }],
@@ -373,7 +378,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     p.conn = null; p.connected = false;
     if (G.phase === 'lobby') { G.players = G.players.filter(x => x !== p); sync(); return; }
     if (G.phase === 'write' && G.q.subject === p.pid && !G.subs[p.pid]) {
-      toastAll(t('{0} left before telling the truth. Next question.', p.name));
+      toastAll('{0} left before telling the truth. Next question.', p.name);
       G.round--; startRound(); return;
     }
     if (G.phase === 'race') finishRace();
@@ -421,7 +426,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const live = G.players.filter(p => p.connected);
     if (!G.pool.length || !live.length) {
       G.phase = 'lobby'; G.players = live;
-      toastAll(t('Tick a pack of facts first.'));
+      toastAll('Tick a pack of facts first.');
       sync(); return;
     }
     const qs = [], n = Math.min(G.rounds, G.pool.length);
@@ -450,7 +455,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const useUs = !quiz && G.packs.some(isUs) && GD().about.length > 0 && live.length >= 3;     // "About us" needs someone to lie and someone else to guess
     if (live.length < needPlayers(G.mode, G.solo) || (!useFacts && !useUs)) {
       G.phase = 'lobby'; G.players = live;
-      toastAll(useFacts || useUs ? t('Not enough players left. Back to the lobby.') : t('Nothing to ask with these packs and this many players.'));
+      toastAll(useFacts || useUs ? 'Not enough players left. Back to the lobby.' : 'Nothing to ask with these packs and this many players.');
       sync(); return;
     }
     G.round++;
@@ -543,9 +548,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         save('localStorage', packsKey(G.lang), JSON.stringify(G.packs));
         sync();
         break;
-      case 'lang':                              // the room's language: the questions and everyone's screen
+      case 'lang':                              // the language of the QUESTIONS, which everyone shares. Screens are each player's own.
         if (!amHost || G.phase !== 'lobby' || !DATA[msg.lang] || msg.lang === G.lang) return;
-        G.lang = uiLang = msg.lang; save('localStorage', 'bfl_lang', G.lang);
+        G.lang = msg.lang;
         G.packs = savedPacks(G.lang); G.decks = { facts: [], us: [] };
         sync();
         break;
@@ -554,6 +559,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         break;
       case 'timed':
         if (amHost && G.phase === 'lobby') { G.timed = !!msg.on; sync(); }
+        break;
+      case 'allowskip':
+        if (amHost && G.phase === 'lobby') { G.skip = !!msg.on; sync(); }
         break;
       case 'race': {                            // a racer reporting where they have got to
         if (G.phase !== 'race' || !p.racing || p.rDone) return;
@@ -595,8 +603,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         sync();
         break;
       }
-      case 'skip':                              // don't wait for stragglers
-        if (!amHost) return;
+      case 'skip':                              // don't wait for stragglers. Only if the room allows it.
+        if (!amHost || !G.skip) return;
         if (G.phase === 'race') { finishRace(true); sync(); return; }   // call time on the race
         if (G.phase === 'write' && (G.q.kind === 'facts' || G.subs[G.q.subject])) {
           G.writers = G.writers.filter(w => G.subs[w]); maybeVote(); sync();
@@ -620,7 +628,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function viewFor(pid) {
     const ph = G.phase, q = G.q;
     const v = {
-      code: G.code, phase: ph, lang: G.lang, solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
+      code: G.code, phase: ph, lang: G.lang, skip: !!G.skip, solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
       total: G.raced && G.race ? G.race.qs.length : G.rounds, streak: G.streak, rounds: G.rounds, packs: G.packs, round: G.round, you: pid, hostPid: G.hostPid,
       players: G.players.map(p => ({
         pid: p.pid, name: p.name, score: p.score, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0,
@@ -670,9 +678,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     if (p && p.conn && p.conn.open) { try { p.conn.send(msg); } catch (e) {} }
   }
 
-  function toastAll(text) {
-    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', text }); } catch (e) {} } });
-    toast(text);
+  function toastAll(k, ...a) {                  // sent as a key, so each player reads it in their own language
+    G.players.forEach(p => { if (p.conn && p.conn.open) { try { p.conn.send({ t: 'toast', k, a }); } catch (e) {} } });
+    toast(t(k, ...a));
   }
 
   /* ---------------- GUEST ---------------- */
@@ -706,7 +714,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   }
 
   function onMsg(msg) {
-    if (msg.t === 'toast') toast(msg.text);
+    if (msg.t === 'toast') toast(msg.k ? t(msg.k, ...(msg.a || [])) : msg.text);
     else if (msg.t === 'nope') {                // I typed the real answer by accident
       nope = msg.why === 'none' ? t('No ready-made lie for this one. Write your own.') : t('That is the real answer! Write a lie instead.');
       const el = document.getElementById('nope'); if (el) el.textContent = nope;
@@ -772,17 +780,16 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     if (box && !same) box.focus();
   }
 
-  // The EN / ไทย switch. It only appears when bfl-th.js is there.
-  function langHTML(off) {
-    if (!DATA.th) return '';
-    const l = lang();
-    return '<div class="lang" role="group" aria-label="Language">' + [['en', 'EN'], ['th', 'ไทย']].map(x =>
-      '<button data-act="lang" data-l="' + x[0] + '"' + (l === x[0] ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + (off ? ' disabled' : '') + '>' + x[1] + '</button>').join('') + '</div>';
+  // The EN / ไทย switch. act 'lang' is my own screen (anyone, any time); act 'qlang' is the room's questions (host, in the lobby).
+  function langHTML(act, cur, off) {
+    return '<div class="lang" role="group">' + [['en', act === 'lang' ? 'EN' : 'English'], ['th', 'ไทย']].map(x =>
+      '<button data-act="' + act + '" data-l="' + x[0] + '"' + (cur === x[0] ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + (off ? ' disabled' : '') + '>' + x[1] + '</button>').join('') + '</div>';
   }
+  const myLangHTML = off => langHTML('lang', lang(), off);
 
   function homeHTML() {
     const dis = busy ? ' disabled' : '';
-    return '<main class="home">' + langHTML(!!busy) +
+    return '<main class="home">' + myLangHTML(!!busy) +
       '<h1 class="logo">Big Fat<br><i>Truth</i> Lie.</h1>' +
       '<p class="tag">' + t('Write a lie. Spot the truth. Fool your friends.') + '</p>' +
       '<label class="field"><span>' + t('Your name') + '</span><input id="name" maxlength="16" autocomplete="off" placeholder="' + t('e.g. Sam') + '" value="' + esc(myName) + '"' + dis + '></label>' +
@@ -811,7 +818,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       : !ticked.length ? t('Tick a pack first')
       : !hasFacts && n < 3 ? t('"About us" needs 3 players') : '';
     const settings =
-      (DATA.th ? '<div class="field inline"><span>' + t('Language') + '</span>' + langHTML() + '</div>' : '') +
+      (DATA.th ? '<div class="field inline"><span>' + t('Questions in') + '</span>' + langHTML('qlang', v.lang) + '</div>' : '') +
       (v.solo ? '' : '<label class="field inline"><span>' + t('Game') + '</span><select id="mode">' +
         Object.keys(MODES).map(k => '<option value="' + k + '"' + (k === v.mode ? ' selected' : '') + '>' + t(MODES[k]) + '</option>').join('') + '</select></label>') +
       '<div class="field"><span>' + t('Question packs') + '</span><div class="packs">' + names.map(p =>
@@ -819,14 +826,16 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<label class="field inline"><span>' + t('How many') + '</span><select id="rounds">' + rounds + '</select></label>' +
       (quiz ? '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="timed"' + (v.timed ? ' checked' : '') + '>' + t('Timed') +
         '<em>' + (v.solo ? t('against the clock') : t('everyone at their own pace')) + '</em></label></div></div>' : '') +
+      (v.solo ? '' : '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="skip"' + (v.skip ? ' checked' : '') + '>' + t('Allow skipping') +
+        '<em>' + t('host can carry on without waiting') + '</em></label></div></div>') +
       '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? t('Start') : t('Start game'))) + '</button>';
     if (v.solo) {
       const b = bestSolo();
-      return '<main class="lobby"><p class="eyebrow">' + t('Solo quiz') + '</p><div class="code small">' + t('You against the facts') + '</div>' +
+      return '<main class="lobby">' + myLangHTML() + '<p class="eyebrow">' + t('Solo quiz') + '</p><div class="code small">' + t('You against the facts') + '</div>' +
         '<p class="note">' + t('Four answers, one is true.') + (b ? t(' Your best: {0}.', bestText(b)) : '') + '</p>' +
         settings + '<button class="btn" data-act="leave">' + t('Back to the start') + '</button></main>';
     }
-    return '<main class="lobby">' +
+    return '<main class="lobby">' + myLangHTML() +
       '<p class="eyebrow">' + t('Room code') + '</p><div class="code">' + esc(v.code) + '</div>' +
       '<button class="btn small" data-act="copy">' + t('Copy invite link') + '</button>' +
       '<h2>' + t('Players') + ' <span class="dim">' + n + '/' + MAX_PLAYERS + '</span></h2>' +
@@ -859,7 +868,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     return '<div class="q"><p>' + label + '</p><h2>' + text + '</h2></div>';
   }
   const nameOf = pid => { const p = view.players.find(x => x.pid === pid); return p ? p.name : t('Someone'); };
-  const barHTML = right => '<header class="bar"><span>' + (view.solo ? t('Solo quiz') : t('Room') + ' <b>' + esc(view.code) + '</b>') + '</span><span>' + right + '</span></header>';
+  const barHTML = right => '<header class="bar"><span>' + (view.solo ? t('Solo quiz') : t('Room') + ' <b>' + esc(view.code) + '</b>') + '</span><span>' + right + '</span>' + myLangHTML() + '</header>';
 
   /* ---------------- THE TIMED QUIZ ---------------- */
   // The strip at the top of a race: how far along everyone is. Scores stay hidden until the end.
@@ -875,7 +884,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function raceHTML() {
     const v = view, qs = v.race.qs, n = qs.length, amHost = v.you === v.hostPid;
     const me = v.players.find(p => p.pid === v.you);
-    const end = !v.solo && amHost ? '<button class="btn" data-act="skip">' + t('End the race now') + '</button>' : '';
+    const end = !v.solo && amHost && v.skip ? '<button class="btn" data-act="skip">' + t('End the race now') + '</button>' : '';
     if (!me || !me.racing) {
       return barHTML(t('Timed quiz')) + raceStripHTML() + '<main class="stage" id="race"><p class="status">' + t('A timed quiz is under way. You will be in the next game.') + '</p><div class="action">' + end + '</div></main>';
     }
@@ -915,7 +924,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? t('Lock in the truth') : t('Hand in my lie')) + '</button>' +
           (w.role === 'lie' && w.canSuggest ? '<button class="btn" data-act="canned">' + t('Give me a lie (half points)') + '</button>' : '');
       }
-      if (amHost && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Carry on without them') + '</button>';
+      if (amHost && v.skip && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Carry on without them') + '</button>';
     } else {
       const m = v.vote, done = v.phase === 'reveal';
       const truth = done ? (m.options.find(o => o.truth) || {}).text : null;
@@ -947,7 +956,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         const got = v.players.filter(p => p.gain !== 0).sort((a, b) => b.gain - a.gain);
         if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b class="' + (p.gain < 0 ? 'neg' : '') + '">' + (p.gain < 0 ? '−' : '+') + Math.abs(p.gain) + '</b></li>').join('') : '<li>' + t('Nobody scored. Impressive.') + '</li>') + '</ul>';
         if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? (v.solo ? t('See how you did') : t('See final scores')) : t('Next question')) + '</button>';
-      } else if (amHost && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Show the answer now') + '</button>';
+      } else if (amHost && v.skip && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Show the answer now') + '</button>';
     }
 
     return barHTML(t('Question {0} of {1}', v.round, v.rounds)) +
@@ -958,7 +967,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const v = view, amHost = v.you === v.hostPid;
     if (v.solo) {
       const score = v.players[0].score, pct = score / v.total, b = bestSolo();
-      return '<main class="lobby"><p class="eyebrow">' + t('Solo quiz') + '</p><div class="code small">' + (v.raced ? t('{0} of {1} in {2}', score, v.total, clock(v.players[0].ms)) : t('{0} of {1}', score, v.total)) + '</div>' +
+      return '<main class="lobby">' + myLangHTML() + '<p class="eyebrow">' + t('Solo quiz') + '</p><div class="code small">' + (v.raced ? t('{0} of {1} in {2}', score, v.total, clock(v.players[0].ms)) : t('{0} of {1}', score, v.total)) + '</div>' +
         '<p class="note">' + (pct === 1 ? t('Flawless. Suspicious, even.') : pct >= 0.7 ? t('Sharp. The facts are worried.') : pct >= 0.4 ? t('Respectable. The facts put up a fight.') : t('The facts win this one.')) +
         (b ? t(' Your best is {0}.', bestText(b)) : '') + '</p>' +
         '<button class="btn primary big" data-act="start">' + t('Play again') + '</button>' +
@@ -973,7 +982,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       : (winners.length === ranked.length && ranked.length > 2) ? t('Everyone ties')
       : t('{0} and {1} tie', winners.slice(0, -1).join(', '), winners[winners.length - 1]);
     const place = p => ranked.findIndex(x => tied(x, p)) + 1;
-    return '<main class="lobby"><p class="eyebrow">' + (v.raced ? t('Fastest brain') : v.mode === 'quiz' ? t('Top of the class') : t('Best liar')) + '</p><div class="code small">' + headline + '</div>' +
+    return '<main class="lobby">' + myLangHTML() + '<p class="eyebrow">' + (v.raced ? t('Fastest brain') : v.mode === 'quiz' ? t('Top of the class') : t('Best liar')) + '</p><div class="code small">' + headline + '</div>' +
       '<ul class="plist rank">' + ranked.map(p =>
         '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + (v.raced ? '/' + v.total + ' · ' + (p.rdone ? clock(p.ms) : t('did not finish')) : '') + '</b></li>').join('') + '</ul>' +
       (amHost
@@ -1001,6 +1010,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   });
   $app.addEventListener('change', e => {
     if (e.target.id === 'rounds') act({ t: 'rounds', rounds: e.target.value });
+    if (e.target.id === 'skip') { save('localStorage', 'bfl_skip', e.target.checked ? '1' : '0'); act({ t: 'allowskip', on: e.target.checked }); }
     if (e.target.id === 'timed') { save('localStorage', 'bfl_timed', e.target.checked ? '1' : '0'); act({ t: 'timed', on: e.target.checked }); }
     if (e.target.id === 'mode') { save('localStorage', 'bfl_mode', e.target.value); act({ t: 'mode', mode: e.target.value }); }
     if (e.target.dataset.pack) act({ t: 'pack', name: e.target.dataset.pack, on: e.target.checked });
@@ -1033,10 +1043,14 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         else prompt(t('Copy this link:'), url);
         break;
       }
-      case 'lang':                              // on the start screen it is my own choice; in a room it is the host's
-        if (view) act({ t: 'lang', lang: el.dataset.l });
-        else if (DATA[el.dataset.l]) { uiLang = el.dataset.l; save('localStorage', 'bfl_lang', uiLang); homeErr = ''; render(); }
+      case 'lang':                              // my own screen: any player, at any moment, without touching anyone else's
+        if (el.dataset.l === uiLang) break;
+        uiLang = el.dataset.l === 'th' ? 'th' : 'en'; save('localStorage', 'bfl_lang', uiLang);
+        if (!view) homeErr = '';
+        if (nope) nope = '';
+        render(true);
         break;
+      case 'qlang': act({ t: 'lang', lang: el.dataset.l }); break;      // host: which language the questions are in
       case 'start': act({ t: 'start' }); break;
       case 'lobby': act({ t: 'lobby' }); break;
       case 'solo': startSolo(); break;
