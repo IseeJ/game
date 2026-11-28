@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Big Fat Lie — write a lie, spot the truth</title>
+<title>Big Fat Lie (Cabbage)</title>
 <meta name="description" content="Everyone invents a fake answer. The real one is hiding among them. Fool your friends and find the truth. Play with a room code.">
 <style>
 :root {
@@ -188,6 +188,7 @@ const CANNED = 1;  // bluff: the same, when you used a ready-made lie (half)
 const TRAP = 1;    // bluff: points you LOSE for picking one of the game's own decoys. (0 would mean no penalty.)
 const KNOWN = 4;   // "About us": points the person the question is about earns for EACH friend who finds their truth
 const QUIZ = 1;    // quiz: points for a right answer
+const FAVS = 2;    // favourite votes: how many ♥ each player can give per question
 
 // A fact is ['question', 'answer', 'other accepted spellings'..., ['wrong answer', ...]]. The last list is optional.
 const truthsOf = f => f.slice(1).filter(x => typeof x === 'string');
@@ -227,9 +228,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     'Need 1 more player': 'ขาดอีก 1 คน', 'Need {0} more players': 'ขาดอีก {0} คน', 'Tick a pack first': 'เลือกชุดคำถามก่อน',
     '"About us" needs 3 players': '"เรื่องของพวกเรา" ต้องมี 3 คน',
     'Questions in': 'คำถามเป็นภาษา', 'Game': 'โหมด', 'Bluff: write lies': 'โกหก: แต่งคำตอบหลอก', 'Quiz: just pick the answer': 'ควิซ: เลือกคำตอบอย่างเดียว',
-    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Allow skipping': 'อนุญาตให้ข้าม', 'Favourite votes': 'โหวตคำตอบที่ชอบ', 'tap ♥ on the best lie, with a prize for the most loved': 'แตะ ♥ ให้คำโกหกที่ชอบที่สุด มีรางวัลขวัญใจมหาชนด้วย',
-    'Tap ♥ on your favourite lie.': 'แตะ ♥ ให้คำโกหกที่คุณชอบที่สุด', 'Crowd favourite': 'ขวัญใจมหาชน', 'Nobody got a ♥ this game.': 'เกมนี้ไม่มีใครได้ ♥ เลย', 'Favourite: {0}': 'ถูกใจ: {0}',
-    'With favourite votes on, tap ♥ on the lie you liked best after each answer. Hearts do not change the score, but the most loved liar gets a prize of their own at the end.': 'ถ้าเปิดโหวตคำตอบที่ชอบ หลังเฉลยแต่ละข้อให้แตะ ♥ ที่คำโกหกที่ชอบที่สุด หัวใจไม่มีผลกับคะแนน แต่คนที่ได้หัวใจมากที่สุดจะได้รางวัลขวัญใจมหาชนตอนจบ', 'host can carry on without waiting': 'เจ้าของห้องไปต่อได้โดยไม่ต้องรอ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
+    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Allow skipping': 'อนุญาตให้ข้าม', 'Favourite votes': 'โหวตคำตอบที่ชอบ', 'tap ♥ on the answers you like, with a prize for the most loved': 'แตะ ♥ ให้คำตอบที่ชอบ มีรางวัลขวัญใจมหาชนด้วย',
+    'Tap ♥ on up to {0} answers you like.': 'แตะ ♥ ให้คำตอบที่คุณชอบได้สูงสุด {0} ข้อ', 'You have {0} ♥ left.': 'คุณเหลือ ♥ อีก {0} ดวง', 'Both ♥ given. Tap one to take it back.': 'ให้ ♥ ครบแล้ว แตะอีกครั้งเพื่อเอาคืน', 'Crowd favourite': 'ขวัญใจมหาชน', 'Nobody got a ♥ this game.': 'เกมนี้ไม่มีใครได้ ♥ เลย', 'Favourite: {0}': 'ถูกใจ: {0}',
+    'With favourite votes on, once your own answer is in you can tap ♥ on up to {0} answers you like. Hearts do not change the score, but the most loved liar gets a prize of their own at the end.': 'ถ้าเปิดโหวตคำตอบที่ชอบ เมื่อเลือกคำตอบของตัวเองแล้ว คุณแตะ ♥ ให้คำตอบที่ชอบได้สูงสุด {0} ข้อ หัวใจไม่มีผลกับคะแนน แต่คนที่ได้หัวใจมากที่สุดจะได้รางวัลขวัญใจมหาชนตอนจบ', 'host can carry on without waiting': 'เจ้าของห้องไปต่อได้โดยไม่ต้องรอ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
     'Start': 'เริ่ม', 'Start game': 'เริ่มเกม', 'Solo quiz': 'ควิซคนเดียว', 'You against the facts': 'คุณ ปะทะ ข้อเท็จจริง',
     'Four answers, one is true.': 'สี่ตัวเลือก ถูกแค่ข้อเดียว', ' Your best: {0}.': ' สถิติดีที่สุด: {0}', 'Back to the start': 'กลับหน้าแรก',
     'Copy invite link': 'คัดลอกลิงก์ชวนเพื่อน', 'Players': 'ผู้เล่น', 'host': 'เจ้าของห้อง', 'you': 'คุณ',
@@ -560,6 +561,17 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     maybeReveal();
   }
 
+  // Favourite votes. You may give hearts once your own answer is in (the person an "About us" question is about
+  // has no vote, so they may start straight away), and you can keep changing them until the next question.
+  const canFav = pid => !!G.fav && !G.solo && G.mode === 'bluff' && !!P(pid) &&
+    (G.phase === 'reveal' || (G.phase === 'vote' && (G.votes[pid] !== undefined || pid === G.q.subject)));
+  // Who a heart counts for: whoever wrote that lie. A heart on the real answer of an "About us" question goes to the person
+  // it is about. Hearts on the game's decoys, on ready-made lies and on the truth of a fact are allowed but count for nobody.
+  const credit = (o, n) => {
+    const to = o.truth ? (G.q.kind === 'us' && G.q.subject ? [G.q.subject] : []) : o.house ? [] : o.authors.filter(a => !G.canned[a]);
+    to.forEach(a => { const w = P(a); if (w) w.likes = Math.max(0, (w.likes || 0) + n); });
+  };
+
   const voters = () => G.players.filter(p => p.connected && p.pid !== G.q.subject);
 
   function maybeReveal() {
@@ -625,14 +637,14 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'allowfav':
         if (amHost && G.phase === 'lobby') { G.fav = !!msg.on; sync(); }
         break;
-      case 'fav': {                             // a ♥ for a favourite lie, after the answer is shown. One per player per question; tapping another moves it.
-        if (!G.fav || G.solo || G.mode !== 'bluff' || G.phase !== 'reveal') return;
-        const likeable = o => o && !o.truth && !o.house && o.authors.length && !o.authors.includes(pid) && !o.authors.every(a => G.canned[a]);
-        const give = (i, n) => G.options[i].authors.forEach(a => { const w = P(a); if (w) w.likes = Math.max(0, (w.likes || 0) + n); });
-        const i = msg.i, had = G.favs[pid];
-        if (!Number.isInteger(i) || !likeable(G.options[i])) return;
-        if (had !== undefined) give(had, -1);
-        if (had === i) delete G.favs[pid]; else { G.favs[pid] = i; give(i, 1); }
+      case 'fav': {                             // a ♥ for an answer you liked. Up to FAVS per player per question; tap again to take one back.
+        if (!canFav(pid)) return;
+        const i = msg.i, o = Number.isInteger(i) && G.options[i], mine = G.favs[pid] || (G.favs[pid] = []);
+        if (!o || o.authors.includes(pid) || (o.truth && pid === G.q.subject)) return;       // not your own answer
+        const at = mine.indexOf(i);
+        if (at >= 0) { mine.splice(at, 1); credit(o, -1); }
+        else if (mine.length < FAVS) { mine.push(i); credit(o, 1); }
+        else return;
         sync();
         break;
       }
@@ -729,15 +741,16 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       const open = ph === 'reveal';
       v.vote = {
         myVote: G.votes[pid] === undefined ? null : G.votes[pid],
-        myFav: open && G.favs && G.favs[pid] !== undefined ? G.favs[pid] : null,
+        canFav: canFav(pid), myFavs: (G.favs && G.favs[pid]) || [],
         waiting: voters().filter(p => G.votes[p.pid] === undefined).length,
         last: G.round >= G.rounds,
         options: G.options.map((o, i) => ({
           text: o.text, own: !o.truth && o.authors.includes(pid),
+          mine: o.authors.includes(pid) || (o.truth && pid === q.subject),      // my own answer: no ♥ for it
           truth: open ? o.truth : false, authors: open ? o.authors : [],
           house: open && !!o.house, readyMade: open && o.authors.length > 0 && o.authors.every(a => G.canned[a]),
           pickers: open ? Object.keys(G.votes).filter(k => G.votes[k] === i) : [],
-          likes: open && G.favs ? Object.keys(G.favs).filter(k => G.favs[k] === i).length : 0
+          likes: open && G.favs ? Object.keys(G.favs).filter(k => G.favs[k].includes(i)).length : 0      // counts stay hidden until the answer is shown
         }))
       };
     }
@@ -883,7 +896,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<li>' + t('All the lies appear with the real answer hidden among them. {0} points for finding the truth, {1} for every friend who falls for your lie.', FIND, FOOL) + '</li>' +
       '<li>' + (TRAP === 1 ? t('With only two of you, the game adds decoys of its own. Pick one and you lose a point.') : TRAP ? t('With only two of you, the game adds decoys of its own. Pick one and you lose {0} points.', TRAP) : t('With only two of you, the game adds decoys of its own. Pick one and you score nothing.')) + '</li>' +
       '<li>' + t('In "About us" questions (three players or more) one of you tells the truth and the rest lie about them. The truth-teller gets {0} points for every friend who finds the truth.', KNOWN) + '</li>' +
-      '<li>' + t('With favourite votes on, tap ♥ on the lie you liked best after each answer. Hearts do not change the score, but the most loved liar gets a prize of their own at the end.') + '</li>' +
+      '<li>' + t('With favourite votes on, once your own answer is in you can tap ♥ on up to {0} answers you like. Hearts do not change the score, but the most loved liar gets a prize of their own at the end.', FAVS) + '</li>' +
       '<li>' + t('<b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.') + '</li></ol>' +
       '</main>';
   }
@@ -909,7 +922,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       (v.solo ? '' : '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="skip"' + (v.skip ? ' checked' : '') + '>' + t('Allow skipping') +
         '<em>' + t('host can carry on without waiting') + '</em></label></div></div>') +
       (v.solo || quiz ? '' : '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="fav"' + (v.fav ? ' checked' : '') + '>' + t('Favourite votes') +
-        '<em>' + t('tap ♥ on the best lie, with a prize for the most loved') + '</em></label></div></div>') +
+        '<em>' + t('tap ♥ on the answers you like, with a prize for the most loved') + '</em></label></div></div>') +
       '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? t('Start') : t('Start game'))) + '</button>';
     if (v.solo) {
       const b = bestSolo();
@@ -1010,6 +1023,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       if (amHost && v.skip && w.mine !== null && w.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Carry on without them') + '</button>';
     } else {
       const m = v.vote, done = v.phase === 'reveal';
+      const favTip = () => { const left = FAVS - m.myFavs.length; return left === FAVS ? t('Tap ♥ on up to {0} answers you like.', FAVS) : left ? t('You have {0} ♥ left.', left) : t('Both ♥ given. Tap one to take it back.'); };
       const truth = done ? (m.options.find(o => o.truth) || {}).text : null;
       const canPick = !done && !iAmSubject && m.myVote === null;
       const names = list => list.map(p => esc(nameOf(p))).join(', ');
@@ -1022,6 +1036,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
           : canPick ? (quiz ? t('Which one is true?') : t('Which one is the truth?'))
           : t('Vote is in. Waiting on {0}.', people(m.waiting))) + '</p>' +
         '<div class="opts">' + m.options.map((o, i) => {
+          // Favourite votes: a ♥ on every answer but my own. Two to give; when both are used the rest go quiet.
+          const heartHTML = (o, i) => { if (!v.fav || !m.canFav) return ''; const on = m.myFavs.includes(i), mine = o.mine;
+            return '<button class="fav' + (on ? ' on' : '') + '" data-act="fav" data-i="' + i + '"' + (mine || (!on && m.myFavs.length >= FAVS) ? ' disabled' : '') + ' aria-label="' + t('Favourite: {0}', esc(o.text)) + '">♥' + (done && o.likes ? ' ' + o.likes : '') + '</button>'; };
           if (done) {
             const who = o.truth ? '<b>' + t('The truth') + '</b>' + (o.authors.length ? ' · ' + t('{0} wrote it by accident', names(o.authors)) : '')
               : o.house ? (quiz ? '' : '<b>' + t('A trap set by the game') + '</b>')
@@ -1031,10 +1048,11 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
               : o.truth ? t('nobody found it') : '';
             const note = [who, picked].filter(Boolean).join(' · ');
             // Favourite votes: a ♥ on every lie a friend actually wrote. Your own lie shows its count but cannot be tapped.
-            const lik = v.fav && !o.truth && !o.house && o.authors.length && !o.readyMade;
-            const heart = lik ? '<button class="fav' + (m.myFav === i ? ' on' : '') + '" data-act="fav" data-i="' + i + '"' + (o.own ? ' disabled' : '') + ' aria-label="' + t('Favourite: {0}', esc(o.text)) + '">♥' + (o.likes ? ' ' + o.likes : '') + '</button>' : '';
+            const heart = heartHTML(o, i);
             return '<div class="opt' + (o.truth ? ' truth' : o.pickers.length && (o.house || v.solo) ? ' trap' : '') + '">' + (heart ? '<span>' : '') + esc(o.text) + (note ? '<small>' + note + '</small>' : '') + (heart ? '</span>' + heart : '') + '</div>';
           }
+          // My answer is in (or the question is about me): the choices stay on screen with a ♥ on each, to tap while waiting.
+          if (m.canFav) return '<div class="opt' + (m.myVote === i ? ' sel' : '') + '"><span>' + esc(o.text) + (o.own ? '<small>' + t('your lie') + '</small>' : m.myVote === i ? '<small>' + t('your pick') + '</small>' : '') + '</span>' + heartHTML(o, i) + '</div>';
           return '<button class="opt' + (m.myVote === i ? ' sel' : '') + '" data-act="vote" data-i="' + i + '"' + (canPick && !o.own ? '' : ' disabled') + '>' +
             esc(o.text) + (o.own ? '<small>' + t('your lie') + '</small>' : '') + '</button>';
         }).join('') + '</div>';
@@ -1042,9 +1060,12 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         // Everyone whose points moved this round. Someone who won and lost points is shown both, even if they cancel out.
         const got = v.players.filter(p => p.up || p.down).sort((a, b) => b.gain - a.gain);
         if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + (p.up ? ' <b>+' + p.up + '</b>' : '') + (p.down ? ' <b class="neg">−' + p.down + '</b>' : '') + '</li>').join('') : '<li>' + t('Nobody scored. Impressive.') + '</li>') + '</ul>';
-        if (v.fav && m.options.some(o => !o.truth && !o.house && o.authors.length && !o.readyMade && !o.own)) body += '<p class="tip">' + t('Tap ♥ on your favourite lie.') + '</p>';
+        if (v.fav && m.canFav) body += '<p class="tip">' + favTip() + '</p>';
         if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? (v.solo ? t('See how you did') : t('See final scores')) : t('Next question')) + '</button>';
-      } else if (amHost && v.skip && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Show the answer now') + '</button>';
+      } else {
+        if (v.fav && m.canFav) body += '<p class="tip">' + favTip() + '</p>';
+        if (amHost && v.skip && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Show the answer now') + '</button>';
+      }
     }
 
     return barHTML(t('Question {0} of {1}', v.round, v.rounds)) +
