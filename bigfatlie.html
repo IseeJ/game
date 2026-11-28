@@ -127,6 +127,13 @@ button.opt:disabled { cursor: not-allowed; opacity: .5; }
 .opt.truth { border-color: var(--truth); box-shadow: inset 0 0 0 1px var(--truth); }
 .opt small { display: block; margin-top: 6px; font-size: .8rem; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--dim); }
 .opt small b { color: var(--lie); }
+/* favourite votes: the heart on each lie at the reveal */
+.opt:has(.fav) { display: flex; align-items: flex-start; gap: 10px; }
+.opt:has(.fav) > span { flex: 1; min-width: 0; }
+.fav { flex: none; appearance: none; border: 2px solid currentColor; background: transparent; color: var(--dim); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: .9rem; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.fav.on { background: var(--lie); border-color: var(--lie); color: #fff; }
+.fav:disabled { cursor: default; opacity: .7; }
+.crowd { margin: 18px 0 0; }
 .opt.truth small b { color: var(--truth); }
 .opt.trap { border-color: var(--lie); }
 .gains li b.neg { color: var(--lie); }
@@ -147,6 +154,19 @@ button.opt:disabled { cursor: not-allowed; opacity: .5; }
 #toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); font-weight: 700; padding: 10px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 40px); z-index: 20; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* the host's "Remove a player" tab and list during a game */
+.hosttab { position: fixed; right: 0; top: 40%; z-index: 30; writing-mode: vertical-rl; padding: 10px 5px; border: 0; border-radius: 10px 0 0 10px; background: rgba(40, 40, 40, .82); color: #fff; font: inherit; font-size: .72rem; font-weight: 700; letter-spacing: .04em; cursor: pointer; opacity: .75; }
+.hosttab:hover, .hosttab:focus-visible { opacity: 1; }
+.hostbox { position: fixed; inset: 0; z-index: 40; background: rgba(20, 20, 20, .6); display: grid; place-items: center; padding: 20px; }
+.hostbox[hidden], .hosttab[hidden] { display: none; }
+.hostcard { width: 100%; max-width: 360px; max-height: 80vh; overflow: auto; background: #fff; color: #222; border-radius: 16px; padding: 22px; text-align: left; }
+.hostcard h2 { margin: 0 0 6px; font-size: 1.2rem; }
+.hostcard p { margin: 0 0 14px; color: #666; font-size: .9rem; }
+.hostcard ul { list-style: none; margin: 0 0 14px; padding: 0; }
+.hostcard li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-top: 6px; border-radius: 10px; background: #f1f1f1; font-weight: 700; }
+.hostcard li em { font-style: normal; font-weight: 400; font-size: .8rem; color: #888; }
+.hostcard .hostclose { width: 100%; padding: 11px; border: 2px solid #ccc; border-radius: 999px; background: #fff; color: #222; font: inherit; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -165,8 +185,8 @@ const tidy = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu
 const FIND = 4;    // bluff: points for picking the truth
 const FOOL = 2;    // bluff: points for each friend who picks the lie you wrote
 const CANNED = 1;  // bluff: the same, when you used a ready-made lie (half)
-const TRAP = 2;    // bluff: points you LOSE for picking one of the game's own decoys
-const KNOWN = 2;   // "About us": points to the truth-teller for each friend who found the truth
+const TRAP = 1;    // bluff: points you LOSE for picking one of the game's own decoys. (0 would mean no penalty.)
+const KNOWN = 4;   // "About us": points the person the question is about earns for EACH friend who finds their truth
 const QUIZ = 1;    // quiz: points for a right answer
 
 // A fact is ['question', 'answer', 'other accepted spellings'..., ['wrong answer', ...]]. The last list is optional.
@@ -194,16 +214,22 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<b>โหมดโกหก:</b> จะมีเรื่องแปลก ๆ ขึ้นมาโดยเว้นคำตอบไว้ ทุกคนพิมพ์คำโกหกที่ฟังดูน่าเชื่อ หรือจะขอคำโกหกสำเร็จรูปก็ได้ แต่ได้คะแนนแค่ครึ่งเดียว',
     'All the lies appear with the real answer hidden among them. {0} points for finding the truth, {1} for every friend who falls for your lie.':
       'คำโกหกทั้งหมดจะขึ้นมาปนกับคำตอบจริง เลือกความจริงถูกได้ {0} คะแนน และได้ {1} คะแนนต่อเพื่อนหนึ่งคนที่หลงเชื่อคำโกหกของคุณ',
+    'With only two of you, the game adds decoys of its own. Pick one and you lose a point.':
+      'ถ้าเล่นกันแค่สองคน เกมจะเติมคำตอบหลอกของเกมเองเข้าไปด้วย ใครเลือกโดนจะเสีย 1 คะแนน',
+    'With only two of you, the game adds decoys of its own. Pick one and you score nothing.':
+      'ถ้าเล่นกันแค่สองคน เกมจะเติมคำตอบหลอกของเกมเองเข้าไปด้วย ใครเลือกโดนจะไม่ได้คะแนน',
     'With only two of you, the game adds decoys of its own. Pick one and you lose {0} points.':
       'ถ้าเล่นกันแค่สองคน เกมจะเติมคำตอบหลอกของเกมเองเข้าไปด้วย ใครเลือกโดนจะเสีย {0} คะแนน',
-    'In "About us" questions (three players or more) one of you tells the truth and the rest lie about them.':
-      'คำถามชุด "เรื่องของพวกเรา" (สามคนขึ้นไป) จะมีหนึ่งคนตอบความจริงเกี่ยวกับตัวเอง ส่วนคนที่เหลือแต่งเรื่องโกหกเกี่ยวกับคนนั้น',
+    'In "About us" questions (three players or more) one of you tells the truth and the rest lie about them. The truth-teller gets {0} points for every friend who finds the truth.':
+      'คำถามชุด "เรื่องของพวกเรา" (สามคนขึ้นไป) จะมีหนึ่งคนตอบความจริงเกี่ยวกับตัวเอง ส่วนคนที่เหลือแต่งเรื่องโกหกเกี่ยวกับคนนั้น คนที่ตอบความจริงจะได้ {0} คะแนนต่อเพื่อนหนึ่งคนที่หาความจริงเจอ',
     '<b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.':
       '<b>โหมดควิซ:</b> ไม่ต้องโกหก มีสี่ตัวเลือก ถูกแค่ข้อเดียว เล่นกับเพื่อนหรือเล่นคนเดียวก็ได้',
     'Need 1 more player': 'ขาดอีก 1 คน', 'Need {0} more players': 'ขาดอีก {0} คน', 'Tick a pack first': 'เลือกชุดคำถามก่อน',
     '"About us" needs 3 players': '"เรื่องของพวกเรา" ต้องมี 3 คน',
     'Questions in': 'คำถามเป็นภาษา', 'Game': 'โหมด', 'Bluff: write lies': 'โกหก: แต่งคำตอบหลอก', 'Quiz: just pick the answer': 'ควิซ: เลือกคำตอบอย่างเดียว',
-    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Allow skipping': 'อนุญาตให้ข้าม', 'host can carry on without waiting': 'เจ้าของห้องไปต่อได้โดยไม่ต้องรอ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
+    'Question packs': 'ชุดคำถาม', 'How many': 'จำนวนข้อ', 'Allow skipping': 'อนุญาตให้ข้าม', 'Favourite votes': 'โหวตคำตอบที่ชอบ', 'tap ♥ on the best lie, with a prize for the most loved': 'แตะ ♥ ให้คำโกหกที่ชอบที่สุด มีรางวัลขวัญใจมหาชนด้วย',
+    'Tap ♥ on your favourite lie.': 'แตะ ♥ ให้คำโกหกที่คุณชอบที่สุด', 'Crowd favourite': 'ขวัญใจมหาชน', 'Nobody got a ♥ this game.': 'เกมนี้ไม่มีใครได้ ♥ เลย', 'Favourite: {0}': 'ถูกใจ: {0}',
+    'With favourite votes on, tap ♥ on the lie you liked best after each answer. Hearts do not change the score, but the most loved liar gets a prize of their own at the end.': 'ถ้าเปิดโหวตคำตอบที่ชอบ หลังเฉลยแต่ละข้อให้แตะ ♥ ที่คำโกหกที่ชอบที่สุด หัวใจไม่มีผลกับคะแนน แต่คนที่ได้หัวใจมากที่สุดจะได้รางวัลขวัญใจมหาชนตอนจบ', 'host can carry on without waiting': 'เจ้าของห้องไปต่อได้โดยไม่ต้องรอ', 'Timed': 'จับเวลา', 'against the clock': 'แข่งกับเวลา', 'everyone at their own pace': 'ต่างคนต่างทำ',
     'Start': 'เริ่ม', 'Start game': 'เริ่มเกม', 'Solo quiz': 'ควิซคนเดียว', 'You against the facts': 'คุณ ปะทะ ข้อเท็จจริง',
     'Four answers, one is true.': 'สี่ตัวเลือก ถูกแค่ข้อเดียว', ' Your best: {0}.': ' สถิติดีที่สุด: {0}', 'Back to the start': 'กลับหน้าแรก',
     'Copy invite link': 'คัดลอกลิงก์ชวนเพื่อน', 'Players': 'ผู้เล่น', 'host': 'เจ้าของห้อง', 'you': 'คุณ',
@@ -225,7 +251,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     'Tell the truth. Everyone else is busy lying about you.': 'ตอบตามความจริง คนอื่นกำลังแต่งเรื่องโกหกเกี่ยวกับคุณอยู่',
     'Write a lie that sounds true.': 'แต่งคำโกหกที่ฟังดูเหมือนเรื่องจริง', 'Make up an answer that sounds like {0}.': 'แต่งคำตอบที่ฟังดูเหมือนเป็น {0}',
     'The honest answer': 'คำตอบจริง', 'Your most convincing lie': 'คำโกหกที่เนียนที่สุดของคุณ',
-    'Keep it short. Your friends will have to pick it out from the lies.': 'ตอบสั้น ๆ เพื่อนต้องหาคำตอบนี้ให้เจอท่ามกลางคำโกหก',
+    'Keep it short. Your friends will have to pick it out from the lies. You get {0} points for each one who does.': 'ตอบสั้น ๆ เพื่อนต้องหาคำตอบนี้ให้เจอท่ามกลางคำโกหก คุณจะได้ {0} คะแนนต่อเพื่อนหนึ่งคนที่หาเจอ',
     'Keep it short and plausible. You score when friends pick it.': 'สั้น ๆ และน่าเชื่อ ได้คะแนนเมื่อเพื่อนเลือกคำตอบของคุณ',
     'Lock in the truth': 'ยืนยันความจริง', 'Hand in my lie': 'ส่งคำโกหก', 'Give me a lie (half points)': 'ขอคำโกหกสำเร็จรูป (ครึ่งคะแนน)', 'Carry on without them': 'ไปต่อไม่รอแล้ว',
     ' That is {0} in a row.': ' ถูกติดกัน {0} ข้อแล้ว', 'The truth about you.': 'ความจริงเกี่ยวกับคุณ', 'The truth about {0}.': 'ความจริงเกี่ยวกับ {0}', 'The truth is out.': 'เฉลยแล้ว',
@@ -319,6 +345,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         code, phase: 'lobby', solo: false, mode: load('localStorage', 'bfl_mode') === 'quiz' ? 'quiz' : 'bluff',
         timed: load('localStorage', 'bfl_timed') === '1', race: null, raced: false,
         skip: load('localStorage', 'bfl_skip') === '1',      // may the host carry on without waiting for everyone?
+        fav: load('localStorage', 'bfl_fav') === '1', favs: {},  // favourite votes: a ♥ for the best lie each round, and a prize for the most loved
         streak: 0, canned: {}, rounds: 8, lang: roomLang(), packs: savedPacks(roomLang()),
         round: 0, hostPid: myPid,
         players: [{ pid: myPid, name: myName, score: 0, gain: 0, conn: null, connected: true }],
@@ -360,6 +387,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const pid = String(msg.pid || '').slice(0, 20);
     const name = String(msg.name || '').trim().slice(0, 16) || 'Player';
     if (!pid) return;
+    if (G.kicked.includes(pid)) { conn.send({ t: 'kicked' }); return; }               // removed by the host: not let back into this room
     let p = P(pid);
     if (p) {                                   // same player coming back
       if (p.pid === G.hostPid) return;
@@ -367,7 +395,6 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       p.conn = conn; p.connected = true; p.name = name;
       if (old && old !== conn) { try { old.close(); } catch (e) {} }
     } else {
-      if (G.kicked.includes(pid)) { conn.send({ t: 'kicked' }); return; }             // removed by the host: not let back into this room
       if (G.players.length >= MAX_PLAYERS) { conn.send({ t: 'full' }); return; }
       G.players.push({ pid, name, score: 0, gain: 0, conn, connected: true });
     }
@@ -391,9 +418,26 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     sync();
   }
 
+  /* Questions already asked are remembered on the host's device (across games, rooms and days), so the
+     same one does not come round again until every question in the ticked packs has had its turn. */
+  const qid = x => { const s = String(Array.isArray(x) ? x[0] : x.f[0]); let n = 2166136261; for (let i = 0; i < s.length; i++) { n ^= s.charCodeAt(i); n = Math.imul(n, 16777619); } return (n >>> 0).toString(36); };
+  let asked = null;
+  const askedSet = () => { if (!asked) { try { asked = new Set(JSON.parse(load('localStorage', 'bfl_asked')) || []); } catch (e) { asked = new Set(); } } return asked; };
+  const keepAsked = () => save('localStorage', 'bfl_asked', JSON.stringify([...askedSet()].slice(-6000)));
+
   function draw(kind, list) {
-    if (!G.decks[kind].length) G.decks[kind] = shuffle(list.map((x, i) => i));
-    return list[G.decks[kind].pop()];
+    const seen = askedSet();
+    if (!G.decks[kind].length) {
+      let fresh = list.map((x, i) => i).filter(i => !seen.has(qid(list[i])));
+      if (!fresh.length) {                      // every one of these has been asked: forget them and go round again
+        list.forEach(x => seen.delete(qid(x)));
+        fresh = list.map((x, i) => i);
+      }
+      G.decks[kind] = shuffle(fresh);
+    }
+    const item = list[G.decks[kind].pop()];
+    seen.add(qid(item)); keepAsked();
+    return item;
   }
 
   // n wrong answers for a fact (d = { f: the fact, pack: its pack }), avoiding anything in `taken`.
@@ -414,7 +458,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
 
   function startGame() {
     G.players = G.players.filter(p => p.connected);
-    G.players.forEach(p => { p.score = 0; p.gain = 0; });
+    G.players.forEach(p => { p.score = 0; p.gain = 0; p.likes = 0; });
     G.round = 0; G.lastSubject = null; G.streak = 0;
     // Every fact from every ticked pack goes into one shuffled pile, remembering which pack it came from.
     G.pool = [].concat(...G.packs.filter(n => !isUs(n)).map(n => GD().packs[n].map(f => ({ f, pack: n }))));
@@ -463,8 +507,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       sync(); return;
     }
     G.round++;
-    G.writers = []; G.subs = {}; G.canned = {}; G.options = []; G.votes = {};
-    G.players.forEach(p => { p.gain = 0; });
+    G.writers = []; G.subs = {}; G.canned = {}; G.options = []; G.votes = {}; G.favs = {};
+    G.players.forEach(p => { p.gain = 0; p.up = 0; p.down = 0; });
     // With both fact packs and "About us" ticked, the two kinds of question take turns.
     const kind = quiz ? 'quiz' : useFacts && useUs ? (G.round % 2 ? 'facts' : 'us') : useFacts ? 'facts' : 'us';
     if (kind === 'us') {
@@ -504,10 +548,12 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       const same = opts.find(o => !o.truth && tidy(o.text) === tidy(text));
       if (same) same.authors.push(pid); else opts.push({ text, truth: false, authors: [pid] });
     });
-    // With only a couple of lies on the table, the game adds decoys of its own. Picking one costs points.
+    // The game adds decoys of its own until there are four choices in all (three wrong answers and the truth).
+    // Two players: 2 lies + 1 decoy. Three or more: no decoys unless two lies were the same. Picking a decoy costs points.
     const lies = opts.length - 1;
-    if (G.q.kind === 'facts' && lies < 3) {
-      wrongAnswers(G.q.d, 4 - lies, opts.map(o => tidy(o.text))).forEach(text => opts.push({ text, truth: false, authors: [], house: true }));
+    const extra = Math.max(0, 3 - lies);
+    if (G.q.kind === 'facts' && extra > 0) {
+      wrongAnswers(G.q.d, extra, opts.map(o => tidy(o.text))).forEach(text => opts.push({ text, truth: false, authors: [], house: true }));
     }
     G.options = shuffle(opts);
     G.phase = 'vote';
@@ -524,12 +570,12 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   }
 
   function reveal() {
-    const add = (pid, n) => { const p = P(pid); if (p) { p.score += n; p.gain += n; } };
+    const add = (pid, n) => { const p = P(pid); if (p) { p.score += n; p.gain += n; if (n > 0) p.up = (p.up || 0) + n; else p.down = (p.down || 0) - n; } };
     Object.keys(G.votes).forEach(pid => {
       const o = G.options[G.votes[pid]];
       if (G.q.kind === 'quiz') { if (o.truth) add(pid, QUIZ); }
-      else if (o.truth) { add(pid, FIND); if (G.q.subject) add(G.q.subject, KNOWN); }
-      else if (o.house) add(pid, -TRAP);                                   // fell for one of the game's decoys
+      else if (o.truth) { add(pid, FIND); if (G.q.kind === 'us' && G.q.subject) add(G.q.subject, KNOWN); }   // "About us": the truth-teller is rewarded for being known
+      else if (o.house) { if (TRAP) add(pid, -TRAP); }                     // fell for one of the game's decoys
       else o.authors.forEach(a => add(a, G.canned[a] ? CANNED : FOOL));
     });
     if (G.solo) { const o = G.options[G.votes[myPid]]; G.streak = o && o.truth ? G.streak + 1 : 0; }
@@ -564,13 +610,29 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'timed':
         if (amHost && G.phase === 'lobby') { G.timed = !!msg.on; sync(); }
         break;
-      case 'kick': {                            // host, in the lobby: remove a player from the room
+      case 'kick': {                            // host: remove a player from the room, in the lobby or mid-game
         const out = P(String(msg.pid));
-        if (!amHost || G.phase !== 'lobby' || !out || out.pid === G.hostPid) return;
+        if (!amHost || !out || out.pid === G.hostPid) return;
         G.kicked.push(out.pid);
-        G.players = G.players.filter(x => x !== out);
-        const c = out.conn; out.conn = null;
+        const c = out.conn;
         if (c) { try { c.send({ t: 'kicked' }); } catch (e) {} setTimeout(() => { try { c.close(); } catch (e) {} }, 300); }
+        if (G.phase === 'lobby') { out.conn = null; G.players = G.players.filter(x => x !== out); }
+        else if (c) hostLeave(c);               // mid-game: exactly as if they had dropped out, so the round stops waiting for them
+        else out.connected = false;
+        sync();
+        break;
+      }
+      case 'allowfav':
+        if (amHost && G.phase === 'lobby') { G.fav = !!msg.on; sync(); }
+        break;
+      case 'fav': {                             // a ♥ for a favourite lie, after the answer is shown. One per player per question; tapping another moves it.
+        if (!G.fav || G.solo || G.mode !== 'bluff' || G.phase !== 'reveal') return;
+        const likeable = o => o && !o.truth && !o.house && o.authors.length && !o.authors.includes(pid) && !o.authors.every(a => G.canned[a]);
+        const give = (i, n) => G.options[i].authors.forEach(a => { const w = P(a); if (w) w.likes = Math.max(0, (w.likes || 0) + n); });
+        const i = msg.i, had = G.favs[pid];
+        if (!Number.isInteger(i) || !likeable(G.options[i])) return;
+        if (had !== undefined) give(had, -1);
+        if (had === i) delete G.favs[pid]; else { G.favs[pid] = i; give(i, 1); }
         sync();
         break;
       }
@@ -642,10 +704,10 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   function viewFor(pid) {
     const ph = G.phase, q = G.q;
     const v = {
-      code: G.code, phase: ph, lang: G.lang, skip: !!G.skip, solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
+      code: G.code, phase: ph, lang: G.lang, skip: !!G.skip, fav: !!G.fav && !G.solo && G.mode === 'bluff', solo: G.solo, mode: G.mode, timed: G.timed, raced: G.raced,
       total: G.raced && G.race ? G.race.qs.length : G.rounds, streak: G.streak, rounds: G.rounds, packs: G.packs, round: G.round, you: pid, hostPid: G.hostPid,
       players: G.players.map(p => ({
-        pid: p.pid, name: p.name, score: p.score, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0,
+        pid: p.pid, name: p.name, score: p.score, likes: p.likes || 0, connected: p.connected, gain: ph === 'reveal' ? p.gain : 0, up: ph === 'reveal' ? p.up || 0 : 0, down: ph === 'reveal' ? p.down || 0 : 0,
         racing: !!p.racing, at: p.rAt || 0, ms: p.rMs || 0, rdone: !!p.rDone,
         done: ph === 'write' ? (!!G.subs[p.pid] || !G.writers.includes(p.pid)) : ph === 'vote' ? (G.votes[p.pid] !== undefined || p.pid === q.subject) : false
       }))
@@ -667,13 +729,15 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       const open = ph === 'reveal';
       v.vote = {
         myVote: G.votes[pid] === undefined ? null : G.votes[pid],
+        myFav: open && G.favs && G.favs[pid] !== undefined ? G.favs[pid] : null,
         waiting: voters().filter(p => G.votes[p.pid] === undefined).length,
         last: G.round >= G.rounds,
         options: G.options.map((o, i) => ({
           text: o.text, own: !o.truth && o.authors.includes(pid),
           truth: open ? o.truth : false, authors: open ? o.authors : [],
           house: open && !!o.house, readyMade: open && o.authors.length > 0 && o.authors.every(a => G.canned[a]),
-          pickers: open ? Object.keys(G.votes).filter(k => G.votes[k] === i) : []
+          pickers: open ? Object.keys(G.votes).filter(k => G.votes[k] === i) : [],
+          likes: open && G.favs ? Object.keys(G.favs).filter(k => G.favs[k] === i).length : 0
         }))
       };
     }
@@ -817,8 +881,9 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       '<button class="btn big" data-act="solo"' + dis + '>' + t('Play solo quiz') + '</button>' +
       '<ol class="how"><li>' + t('<b>Bluff:</b> a strange fact comes up with the answer missing. Everyone types a believable lie, or takes a ready-made one for half the points.') + '</li>' +
       '<li>' + t('All the lies appear with the real answer hidden among them. {0} points for finding the truth, {1} for every friend who falls for your lie.', FIND, FOOL) + '</li>' +
-      '<li>' + t('With only two of you, the game adds decoys of its own. Pick one and you lose {0} points.', TRAP) + '</li>' +
-      '<li>' + t('In "About us" questions (three players or more) one of you tells the truth and the rest lie about them.') + '</li>' +
+      '<li>' + (TRAP === 1 ? t('With only two of you, the game adds decoys of its own. Pick one and you lose a point.') : TRAP ? t('With only two of you, the game adds decoys of its own. Pick one and you lose {0} points.', TRAP) : t('With only two of you, the game adds decoys of its own. Pick one and you score nothing.')) + '</li>' +
+      '<li>' + t('In "About us" questions (three players or more) one of you tells the truth and the rest lie about them. The truth-teller gets {0} points for every friend who finds the truth.', KNOWN) + '</li>' +
+      '<li>' + t('With favourite votes on, tap ♥ on the lie you liked best after each answer. Hearts do not change the score, but the most loved liar gets a prize of their own at the end.') + '</li>' +
       '<li>' + t('<b>Quiz:</b> no lying. Four answers, one is true. Play it with friends or solo.') + '</li></ol>' +
       '</main>';
   }
@@ -843,6 +908,8 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         '<em>' + (v.solo ? t('against the clock') : t('everyone at their own pace')) + '</em></label></div></div>' : '') +
       (v.solo ? '' : '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="skip"' + (v.skip ? ' checked' : '') + '>' + t('Allow skipping') +
         '<em>' + t('host can carry on without waiting') + '</em></label></div></div>') +
+      (v.solo || quiz ? '' : '<div class="field"><div class="packs"><label class="tick"><input type="checkbox" id="fav"' + (v.fav ? ' checked' : '') + '>' + t('Favourite votes') +
+        '<em>' + t('tap ♥ on the best lie, with a prize for the most loved') + '</em></label></div></div>') +
       '<button class="btn primary big" data-act="start"' + (block ? ' disabled' : '') + '>' + (block || (v.solo ? t('Start') : t('Start game'))) + '</button>';
     if (v.solo) {
       const b = bestSolo();
@@ -936,7 +1003,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
         body += '<p class="status">' + (w.role === 'truth' ? t('Tell the truth. Everyone else is busy lying about you.') : q.kind === 'facts' ? t('Write a lie that sounds true.') : t('Make up an answer that sounds like {0}.', subject)) + '</p>' +
           '<input id="answer" maxlength="' + MAX_LEN + '" autocomplete="off" placeholder="' + (w.role === 'truth' ? t('The honest answer') : t('Your most convincing lie')) + '" value="' + esc(draft) + '">' +
           '<p class="err" id="nope">' + esc(nope) + '</p>' +
-          '<p class="tip">' + (w.role === 'truth' ? t('Keep it short. Your friends will have to pick it out from the lies.') : t('Keep it short and plausible. You score when friends pick it.')) + '</p>';
+          '<p class="tip">' + (w.role === 'truth' ? t('Keep it short. Your friends will have to pick it out from the lies. You get {0} points for each one who does.', KNOWN) : t('Keep it short and plausible. You score when friends pick it.')) + '</p>';
         action = '<button class="btn primary big" data-act="write"' + (draft.trim() ? '' : ' disabled') + '>' + (w.role === 'truth' ? t('Lock in the truth') : t('Hand in my lie')) + '</button>' +
           (w.role === 'lie' && w.canSuggest ? '<button class="btn" data-act="canned">' + t('Give me a lie (half points)') + '</button>' : '');
       }
@@ -963,14 +1030,19 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
               : o.pickers.length ? t(o.truth ? 'found by {0}' : o.house ? (quiz ? 'picked by {0}' : 'caught {0}') : 'fooled {0}', names(o.pickers))
               : o.truth ? t('nobody found it') : '';
             const note = [who, picked].filter(Boolean).join(' · ');
-            return '<div class="opt' + (o.truth ? ' truth' : o.pickers.length && (o.house || v.solo) ? ' trap' : '') + '">' + esc(o.text) + (note ? '<small>' + note + '</small>' : '') + '</div>';
+            // Favourite votes: a ♥ on every lie a friend actually wrote. Your own lie shows its count but cannot be tapped.
+            const lik = v.fav && !o.truth && !o.house && o.authors.length && !o.readyMade;
+            const heart = lik ? '<button class="fav' + (m.myFav === i ? ' on' : '') + '" data-act="fav" data-i="' + i + '"' + (o.own ? ' disabled' : '') + ' aria-label="' + t('Favourite: {0}', esc(o.text)) + '">♥' + (o.likes ? ' ' + o.likes : '') + '</button>' : '';
+            return '<div class="opt' + (o.truth ? ' truth' : o.pickers.length && (o.house || v.solo) ? ' trap' : '') + '">' + (heart ? '<span>' : '') + esc(o.text) + (note ? '<small>' + note + '</small>' : '') + (heart ? '</span>' + heart : '') + '</div>';
           }
           return '<button class="opt' + (m.myVote === i ? ' sel' : '') + '" data-act="vote" data-i="' + i + '"' + (canPick && !o.own ? '' : ' disabled') + '>' +
             esc(o.text) + (o.own ? '<small>' + t('your lie') + '</small>' : '') + '</button>';
         }).join('') + '</div>';
       if (done) {
-        const got = v.players.filter(p => p.gain !== 0).sort((a, b) => b.gain - a.gain);
-        if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + ' <b class="' + (p.gain < 0 ? 'neg' : '') + '">' + (p.gain < 0 ? '−' : '+') + Math.abs(p.gain) + '</b></li>').join('') : '<li>' + t('Nobody scored. Impressive.') + '</li>') + '</ul>';
+        // Everyone whose points moved this round. Someone who won and lost points is shown both, even if they cancel out.
+        const got = v.players.filter(p => p.up || p.down).sort((a, b) => b.gain - a.gain);
+        if (!v.solo) body += '<ul class="gains">' + (got.length ? got.map(p => '<li>' + esc(p.name) + (p.up ? ' <b>+' + p.up + '</b>' : '') + (p.down ? ' <b class="neg">−' + p.down + '</b>' : '') + '</li>').join('') : '<li>' + t('Nobody scored. Impressive.') + '</li>') + '</ul>';
+        if (v.fav && m.options.some(o => !o.truth && !o.house && o.authors.length && !o.readyMade && !o.own)) body += '<p class="tip">' + t('Tap ♥ on your favourite lie.') + '</p>';
         if (amHost || iAmSubject) action = '<button class="btn primary big" data-act="next">' + (m.last ? (v.solo ? t('See how you did') : t('See final scores')) : t('Next question')) + '</button>';
       } else if (amHost && v.skip && (m.myVote !== null || iAmSubject) && m.waiting > 0) action = '<button class="btn" data-act="skip">' + t('Show the answer now') + '</button>';
     }
@@ -998,9 +1070,14 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       : (winners.length === ranked.length && ranked.length > 2) ? t('Everyone ties')
       : t('{0} and {1} tie', winners.slice(0, -1).join(', '), winners[winners.length - 1]);
     const place = p => ranked.findIndex(x => tied(x, p)) + 1;
+    // Favourite votes: a second prize, for whoever collected the most ♥. It has nothing to do with the points.
+    const showFav = v.fav && !v.raced, mostLikes = Math.max(0, ...v.players.map(p => p.likes || 0));
+    const loved = v.players.filter(p => mostLikes > 0 && p.likes === mostLikes).map(p => esc(p.name));
+    const crowd = !showFav ? '' : '<p class="eyebrow crowd">' + t('Crowd favourite') + '</p>' +
+      (loved.length ? '<div class="code small">' + (loved.length === 1 ? loved[0] : loved.slice(0, -1).join(', ') + ' & ' + loved[loved.length - 1]) + ' ♥ ' + mostLikes + '</div>' : '<p class="note">' + t('Nobody got a ♥ this game.') + '</p>');
     return '<main class="lobby">' + myLangHTML() + '<p class="eyebrow">' + (v.raced ? t('Fastest brain') : v.mode === 'quiz' ? t('Top of the class') : t('Best liar')) + '</p><div class="code small">' + headline + '</div>' +
       '<ul class="plist rank">' + ranked.map(p =>
-        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + (v.raced ? '/' + v.total + ' · ' + (p.rdone ? clock(p.ms) : t('did not finish')) : '') + '</b></li>').join('') + '</ul>' +
+        '<li class="' + (place(p) === 1 ? 'top' : '') + '"><span>' + place(p) + '. ' + esc(p.name) + '</span><b>' + p.score + (v.raced ? '/' + v.total + ' · ' + (p.rdone ? clock(p.ms) : t('did not finish')) : '') + (showFav ? ' · ♥ ' + (p.likes || 0) : '') + '</b></li>').join('') + '</ul>' + crowd +
       (amHost
         ? '<button class="btn primary big" data-act="start"' + (v.players.filter(p => p.connected).length < needPlayers(v.mode, v.solo) ? ' disabled' : '') + '>' + t('Play again') + '</button>' +
           '<button class="btn" data-act="lobby">' + t('Back to lobby') + '</button>'
@@ -1026,6 +1103,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
   });
   $app.addEventListener('change', e => {
     if (e.target.id === 'rounds') act({ t: 'rounds', rounds: e.target.value });
+    if (e.target.id === 'fav') { save('localStorage', 'bfl_fav', e.target.checked ? '1' : '0'); act({ t: 'allowfav', on: e.target.checked }); }
     if (e.target.id === 'skip') { save('localStorage', 'bfl_skip', e.target.checked ? '1' : '0'); act({ t: 'allowskip', on: e.target.checked }); }
     if (e.target.id === 'timed') { save('localStorage', 'bfl_timed', e.target.checked ? '1' : '0'); act({ t: 'timed', on: e.target.checked }); }
     if (e.target.id === 'mode') { save('localStorage', 'bfl_mode', e.target.value); act({ t: 'mode', mode: e.target.value }); }
@@ -1090,6 +1168,7 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
       case 'canned': act({ t: 'write', canned: true }); break;
       case 'vote': act({ t: 'vote', i: parseInt(el.dataset.i, 10) }); break;
       case 'skip': act({ t: 'skip' }); break;
+      case 'fav': act({ t: 'fav', i: parseInt(el.dataset.i, 10) }); break;
       case 'next': act({ t: 'next' }); break;
       case 'reconnect':
         toast(t('Reconnecting…'));
@@ -1105,6 +1184,36 @@ const decoysOf = f => f.find(x => Array.isArray(x)) || [];
     const el = document.getElementById('clock');
     if (el && race && view && view.phase === 'race' && race.picked === null) el.textContent = clock(race.ms + Date.now() - race.t0);
   }, 100);
+
+  // The Remove buttons in the mid-game list (the lobby ones go through go()).
+  document.addEventListener('click', e => { const b = e.target.closest('.hostbox .kick'); if (b) act({ t: 'kick', pid: b.dataset.pid }); });
+
+  /* ---------------- HOST: REMOVE A PLAYER MID-GAME ----------------
+     A small tab on the edge of the host's screen during a game. It opens a list of players;
+     removing one makes the game stop waiting for them, and they cannot come back to this room. */
+  (() => {
+    const tab = document.createElement('button'), box = document.createElement('div');
+    tab.className = 'hosttab'; tab.type = 'button'; tab.textContent = 'Remove a player'; tab.hidden = true;
+    box.className = 'hostbox'; box.hidden = true;
+    document.body.appendChild(tab); document.body.appendChild(box);
+    const safe = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let shown = '';
+    const paint = () => {
+      const on = !!(isHost && view && view.players && view.phase !== 'lobby' && view.players.length > 1);
+      tab.hidden = !on; if (!on) { box.hidden = true; shown = ''; return; }
+      if (box.hidden) return;
+      const others = view.players.filter(p => p.pid !== view.hostPid);
+      const key = others.map(p => p.pid + p.name + p.connected).join('|');
+      if (key === shown) return;                // only redraw when the list changes
+      shown = key;
+      box.innerHTML = '<div class="hostcard"><h2>Remove a player</h2><p>The game stops waiting for them, and they cannot rejoin this room.</p>' +
+        (others.length ? '<ul>' + others.map(p => '<li><span>' + safe(p.name) + (p.connected === false ? ' <em>away</em>' : '') + '</span><button class="kick" data-pid="' + safe(p.pid) + '" aria-label="Remove ' + safe(p.name) + '">Remove</button></li>').join('') + '</ul>' : '<p>Nobody else is here.</p>') +
+        '<button type="button" class="hostclose">Close</button></div>';
+    };
+    tab.addEventListener('click', () => { box.hidden = false; shown = ''; paint(); });
+    box.addEventListener('click', e => { if (e.target === box || e.target.closest('.hostclose')) box.hidden = true; });
+    setInterval(paint, 400);
+  })();
 
   window.addEventListener('beforeunload', e => {
     if (isHost && G && G.players.length > 1) { e.preventDefault(); e.returnValue = ''; }
